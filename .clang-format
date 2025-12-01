@@ -1,0 +1,19 @@
+BasedOnStyle: Google
+IndentWidth: 4
+
+ContinuationIndentWidth: 4                                # No. spaces used for line continuations (wrapped lines)
+
+ColumnLimit: 120                                          # Max. line length before automatic wrapping (0 = no limit)
+
+AlignAfterOpenBracket: BlockIndent                        # How to align args after opening bracket:
+                                                          # BlockIndent: Use continuation indent, add line break after opening & before closing bracket
+
+AllowAllParametersOfDeclarationOnNextLine: false          # Prevent putting all function parameters on next line when declaration doesn't fit
+
+BinPackParameters: false                                  # Each function parameter goes on its own line when they don't fit on one line
+                                                          # Otherwise, would allow packing multiple parameters per line
+
+BinPackArguments: false                                   # Same thing but for invocations rather than declarations
+
+BreakBeforeBinaryOperators: NonAssignment                 # Where to break lines around binary operators
+                                                          # NonAssignment: break before non-assignment ops
