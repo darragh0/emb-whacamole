@@ -1,6 +1,7 @@
 #include "io_expander.h"
 
 #include <stdint.h>
+#include <stdio.h>
 
 #include "i2c.h"
 #include "mxc_errors.h"
@@ -69,8 +70,9 @@ void make_leds_look_pretty_n_shi(uint32_t sleep_ms, uint32_t stay_on_for_ms) {
         }
     }
 
-    MS_SLEEP(stay_on_for_ms);
     all_led_off(&led_pattern);
+    printf("%X", led_pattern);
+    io_expander_write_leds(led_pattern);
 }
 
 int io_expander_init(void) {
@@ -80,7 +82,11 @@ int io_expander_init(void) {
     int errno2 = MXC_I2C_SetFrequency(I2C_MASTER, I2C_FREQ);
     if (errno2 != I2C_FREQ) return errno2;
 
-    // Wake up the mf leds
+    // Wake up the mf buttons and leds
+    uint8_t initial_btn_state = 0xFF;  // Active low -- 1 = released (0 = pressed)
+    int errno3 = _mk_i2c_master_tx(ADDR_IN, &initial_btn_state, true);
+    if (errno3 != E_SUCCESS) return errno3;
+
     uint8_t initial_led_state = 0x00;
     return _mk_i2c_master_tx(ADDR_OUT, &initial_led_state, true);
 }
@@ -94,7 +100,7 @@ bool is_btn_pressed(const uint8_t btn, uint8_t hardware_state) {
 
     uint8_t pin = BTN_MAP[btn];
 
-    // `!` flip cos "Active Low" -- so 0 = pressed, 1 = released
+    // `!` flip cos active low
     //
     // (1 << pin)            -> Gets the one bit we want
     // hardware_state & ..   -> Ignores all other bits
