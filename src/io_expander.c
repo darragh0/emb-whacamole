@@ -1,7 +1,6 @@
 #include "io_expander.h"
 
 #include <stdint.h>
-#include <stdio.h>
 
 #include "i2c.h"
 #include "mxc_errors.h"
@@ -71,7 +70,6 @@ void make_leds_look_pretty_n_shi(uint32_t sleep_ms, uint32_t stay_on_for_ms) {
     }
 
     all_led_off(&led_pattern);
-    printf("%X", led_pattern);
     io_expander_write_leds(led_pattern);
 }
 

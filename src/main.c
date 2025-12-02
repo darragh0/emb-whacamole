@@ -8,11 +8,18 @@
 #include "stdbool.h"
 #include "utils.h"
 
+static void printbin(uint8_t x) {
+    for (int i = 7; i >= 0; i--) {
+        putchar(((x >> i) & 1) + '0');
+        if (i == 4) putchar(' ');
+    }
+}
+
 int main(void) {
-    printf("\n\x1b[92m=== \x1b[1;96mButton-to-LED Mapper \x1b[0;92m===\x1b[0m\n");
+    printf("\n=== \x1b[96mButton-to-LED Mapper\x1b[0m ===\n\n");
 
     if (io_expander_init() != E_SUCCESS) {
-        printf("Failed to init MAX7325\n");
+        printf("\x1b[91merror\x1b[0m: failed to init MAX7325\n");
         return -1;
     }
 
@@ -30,6 +37,11 @@ int main(void) {
                 if (!btns_pressed[i]) {
                     btns_pressed[i] = true;
                     printf("Button \x1b[96m%d\x1b[0m pressed\n", i);
+                    printf("\x1b[2m  Button state: ");
+                    printbin(btn_state);
+                    printf("\n  LED state:    ");
+                    printbin(led_pattern);
+                    printf("\x1b[0m\n\n");
                 }
             } else {
                 btns_pressed[i] = false;
