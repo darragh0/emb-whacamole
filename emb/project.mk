@@ -16,7 +16,7 @@
  #
  ##############################################################################
 # This file can be used to set build configuration
-# variables.  These variables are defined in a file called
+# variables.  These variables are defined in a file called 
 # "Makefile" that is located next to this one.
 
 # For instructions on how to use this system, see
@@ -24,5 +24,8 @@
 
 # **********************************************************
 
-# Add your config here!
-BOARD = FTHR_Apps_P1
+PROJECT=emb
+BOARD=EvKit_V1
+TARGET=MAX32655
+
+# Add any additional configs here!
