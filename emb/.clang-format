@@ -1,5 +1,9 @@
-BasedOnStyle: Google
+BasedOnStyle: LLVM
 IndentWidth: 4
+PointerAlignment: Left
+IndentGotoLabels: true
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
 
 ContinuationIndentWidth: 4                                # No. spaces used for line continuations (wrapped lines)
 
@@ -16,4 +20,3 @@ BinPackParameters: false                                  # Each function parame
 BinPackArguments: false                                   # Same thing but for invocations rather than declarations
 
 BreakBeforeBinaryOperators: NonAssignment                 # Where to break lines around binary operators
-                                                          # NonAssignment: break before non-assignment ops

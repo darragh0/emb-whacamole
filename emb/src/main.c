@@ -3,28 +3,18 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "game.h"
 #include "io_expander.h"
 #include "mxc_errors.h"
+#include "scr_utils.h"
 #include "stdbool.h"
 #include "utils.h"
 
-/* random num generator with simple xorshift so no stdlib/time is required */
-static uint32_t rng_state = 0xDEADBEEF;
-static uint32_t next_rand(void)
-{
-    uint32_t x = rng_state;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    rng_state = x;
-    return x;
-}
+static void random_button_lightup(void) {
+    uint32_t rng = 0xDEADBEEF;
 
-
-static void random_button_lightup(void)
-{
     while (true) {
-        int target = (int)(next_rand() % BUTTON_COUNT);
+        int target = (int)(next_rand(&rng) % BUTTON_COUNT);
 
         uint8_t led_pattern = 0;
         led_on(target, &led_pattern);
@@ -42,7 +32,7 @@ static void random_button_lightup(void)
                 io_expander_write_leds(0);
                 printf("Hit %d\n", target);
                 MS_SLEEP(120);
-                break; 
+                break;
             }
 
             MS_SLEEP(30);
@@ -50,19 +40,18 @@ static void random_button_lightup(void)
     }
 }
 
-
-
 int main(void) {
-    printf("\n=== \x1b[96mButton-to-LED Mapper\x1b[0m ===\n\n");
+    welcome();
 
-    if (io_expander_init() != E_SUCCESS) {
-        printf("\x1b[91merror\x1b[0m: failed to init MAX7325\n");
+    int errno = io_expander_init();
+    if (errno != E_SUCCESS) {
+        eprintf("failed to init MAX7325\n");
         return -1;
     }
 
-    make_leds_look_pretty_n_shi(250, 500);
-
-    
+    await_start();
     random_button_lightup();
+
+    io_expander_deinit();
     return 0;
 }
