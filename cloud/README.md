@@ -26,6 +26,11 @@ python mqtt_worker.py
   - `MQTT_BROKER` (default: `localhost`)
   - `MQTT_PORT` (default: `1883`)
 
+## Starting a local MQTT broker (mosquitto)
+- Docker: `docker run -p 1883:1883 eclipse-mosquitto`
+- Native (Debian/Ubuntu): `sudo apt install mosquitto` then `mosquitto -v`
+- Course server: use the provided broker host/port (set `MQTT_BROKER`/`MQTT_PORT` accordingly).
+
 ## Running the leaderboard UI (optional, human-facing)
 ```bash
 cd cloud
