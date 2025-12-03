@@ -34,7 +34,7 @@ void cls(void);
  *
  * @see macros in scr_utils.h
  */
-void cprintf(const char* msg, int n_clrs, ...);
+void cprintf(const char* msg, const int n_clrs, ...);
 
 /**
  * @brief Print error message

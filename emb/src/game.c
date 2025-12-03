@@ -1,5 +1,6 @@
 #include "game.h"
 #include "io_expander.h"
+#include "led.h"
 #include "scr_utils.h"
 #include "utils.h"
 #include <stdio.h>

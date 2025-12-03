@@ -7,7 +7,7 @@ void curhide(void) { printf("\033[?25l"); }
 
 void cls(void) { printf("\033[2J"); }
 
-void cprintf(const char* msg, int n_clrs, ...) {
+void cprintf(const char* msg, const int n_clrs, ...) {
     va_list args;
     va_start(args, n_clrs);
     for (int i = 0; i < n_clrs; i++) {
@@ -17,7 +17,7 @@ void cprintf(const char* msg, int n_clrs, ...) {
     va_end(args);
 }
 
-void eprintf(const char* msg) {
+void eprintf(const char* const msg) {
     fprintf(stderr, "%s%s%s", RED, msg, RST);
     MS_SLEEP(500);
 }

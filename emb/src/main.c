@@ -3,8 +3,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "btn.h"
 #include "game.h"
 #include "io_expander.h"
+#include "led.h"
 #include "mxc_errors.h"
 #include "scr_utils.h"
 #include "stdbool.h"
@@ -14,7 +16,7 @@ static void random_button_lightup(void) {
     uint32_t rng = 0xDEADBEEF;
 
     while (true) {
-        int target = (int)(next_rand(&rng) % BUTTON_COUNT);
+        int target = (int)(next_rand(&rng) % BTN_COUNT);
 
         uint8_t led_pattern = 0;
         led_on(target, &led_pattern);
@@ -52,6 +54,5 @@ int main(void) {
     await_start();
     random_button_lightup();
 
-    io_expander_deinit();
-    return 0;
+    return io_expander_deinit();
 }

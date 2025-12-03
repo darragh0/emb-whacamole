@@ -12,4 +12,4 @@
  *
  * @return Random number
  * */
-uint32_t next_rand(uint32_t *state);
+uint32_t next_rand(uint32_t* const state);
