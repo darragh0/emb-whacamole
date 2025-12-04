@@ -122,7 +122,6 @@ static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
     err:
         lives--;
         printf("%s   %s(Lives: %s%d%s%s)%s\n", RST, DIM, YEL, lives, RST, DIM, RST);
-        MS_SLEEP(500);
         feedback_late_or_miss();
         if (lives == 0) return;
     }
