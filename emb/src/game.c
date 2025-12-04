@@ -4,6 +4,7 @@
 #include "leds.h"
 #include "scr_utils.h"
 #include "utils.h"
+#include <stdint.h>
 #include <stdio.h>
 
 static uint8_t lives;
@@ -121,6 +122,7 @@ static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
     err:
         lives--;
         printf("%s   %s(Lives: %s%d%s%s)%s\n", RST, DIM, YEL, lives, RST, DIM, RST);
+        MS_SLEEP(500);
         feedback_late_or_miss();
         if (lives == 0) return;
     }
@@ -168,14 +170,15 @@ void game_run(void) {
     for (uint8_t lvl = 0; lvl < LVLS; lvl++) {
         printf("\n%sLevel %d%s (Lives: %s%d%s)\n", GRN, lvl + 1, RST, YEL, lives, RST);
         game_run_level(lvl, POPS_PER_LVL[lvl]);
-
         if (lives == 0) {
             printf("\n%sGame Over!%s (Reached %sLevel %d%s)\n", RED, RST, GRN, lvl + 1, RST);
+            MS_SLEEP(500);
             feedback_game_over();
             return;
         }
     }
 
     printf("\nCongratulations! Completed all 8 levels with %s%d%s lives remaining!\n", GRN, lives, RST);
+    MS_SLEEP(500);
     feedback_win();
 }
