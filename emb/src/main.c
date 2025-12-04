@@ -1,3 +1,8 @@
+#include "game.h"
+#include "io_expander.h"
+#include "scr_utils.h"
+#include <mxc_errors.h>
+
 /**
  * @brief Whac-A-Mole game.
  *
@@ -15,11 +20,6 @@
  *
  * The game ends when you run out of lives or when you complete all 8 levels successfully.
  */
-
-#include "game.h"
-#include "io_expander.h"
-#include "mxc_errors.h"
-#include "scr_utils.h"
 
 int main(void) {
     welcome();

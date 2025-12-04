@@ -1,10 +1,8 @@
 #include "io_expander.h"
-
+#include <i2c.h>
+#include <mxc_errors.h>
+#include <stdbool.h>
 #include <stdint.h>
-
-#include "i2c.h"
-#include "mxc_errors.h"
-#include "stdbool.h"
 
 /**
  * @brief Send a single byte over I2C
