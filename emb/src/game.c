@@ -162,10 +162,10 @@ success:
 }
 
 void game_run(void) {
-    lives = 5;
-    rng_state = 0xDEADBEEF;
+    lives = LIVES;
+    rng_state = RNG_INIT_STATE;
 
-    for (uint8_t lvl = 0; lvl < 1; lvl++) {
+    for (uint8_t lvl = 0; lvl < LVLS; lvl++) {
         printf("\n%sLevel %d%s (Lives: %s%d%s)\n", GRN, lvl + 1, RST, YEL, lives, RST);
         game_run_level(lvl, POPS_PER_LVL[lvl]);
 

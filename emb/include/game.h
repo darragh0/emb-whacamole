@@ -2,6 +2,10 @@
 
 /** @brief Whac-A-Mole game entry point */
 
+#define LVLS 8
+#define LIVES 5
+#define RNG_INIT_STATE 0xDEADBEEF
+
 /** @brief Pop outcome states */
 typedef enum {
     POP_HIT,
