@@ -1,0 +1,27 @@
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+
+/** @brief Button-related utilities **/
+
+#define BTN_COUNT 8
+
+extern const uint8_t BTN_MAP[];
+
+/**
+ * @brief Check if a button is pressed
+ *
+ * @param btn Button to check (0-7)
+ * @param btn_state Button state from last read
+ *
+ * @return true if pressed, false if not
+ * @see io_expander_read_btns in io_expander.h
+ */
+static inline const bool is_btn_pressed(const uint8_t btn, const uint8_t btn_state) {
+    // `!` flip cos active low
+    //
+    // (1 << pin)            -> Gets the one bit we want
+    // hardware_state & ..   -> Ignores all other bits
+    return !(btn_state & (1 << BTN_MAP[btn]));
+}

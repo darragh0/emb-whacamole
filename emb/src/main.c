@@ -1,46 +1,25 @@
-/** @brief Shows a pretty LED pattern on startup, then maps button presses to LEDs */
+/**
+ * @brief Whac-A-Mole game.
+ *
+ * @details
+ * There are 8 levels, each with 10 pops (a pop is when an LED lights up for a given duration).
+ * You start of with 5 lives.
+ *
+ * The duration of a pop ranges from 1500ms (lowest/easiest level) to 250ms (highest/hardest level).
+ * Your goal is to hit the corresponding button in time.
+ *
+ * Pop result:
+ *   1. HIT:        Hit the corresponding button in time
+ *   2. MISS:       Hit the wrong button                                        (-1 life)
+ *   3. LATE:       Hit the corresponding button late OR did nothing in time    (-1 life)
+ *
+ * The game ends when you run out of lives or when you complete all 8 levels successfully.
+ */
 
-#include <stdint.h>
-#include <stdio.h>
-
-#include "btn.h"
 #include "game.h"
 #include "io_expander.h"
-#include "led.h"
 #include "mxc_errors.h"
 #include "scr_utils.h"
-#include "stdbool.h"
-#include "utils.h"
-
-static void random_button_lightup(void) {
-    uint32_t rng = 0xDEADBEEF;
-
-    while (true) {
-        int target = (int)(next_rand(&rng) % BTN_COUNT);
-
-        uint8_t led_pattern = 0;
-        led_on(target, &led_pattern);
-        if (io_expander_write_leds(led_pattern) != E_SUCCESS) return;
-
-        printf("Whack-a-mole: light at %d\n", target);
-
-        /* poll until the target button is pressed */
-        while (true) {
-            uint8_t btn_state = 0;
-            if (io_expander_read_btns(&btn_state) != E_SUCCESS) return;
-
-            if (is_btn_pressed(target, btn_state)) {
-
-                io_expander_write_leds(0);
-                printf("Hit %d\n", target);
-                MS_SLEEP(120);
-                break;
-            }
-
-            MS_SLEEP(30);
-        }
-    }
-}
 
 int main(void) {
     welcome();
@@ -48,11 +27,11 @@ int main(void) {
     int errno = io_expander_init();
     if (errno != E_SUCCESS) {
         eprintf("failed to init MAX7325\n");
-        return -1;
+        return errno;
     }
 
     await_start();
-    random_button_lightup();
+    game_run();
 
     return io_expander_deinit();
 }
