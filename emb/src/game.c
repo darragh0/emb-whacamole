@@ -11,7 +11,7 @@ static uint8_t lives;
 static uint32_t rng_state;
 
 static const uint8_t POPS_PER_LVL[8] = {[0 ... 7] = 10};
-static const uint16_t POP_DURATIONS[8] = {1500, 1250, 1000, 750, 600, 500, 350, 250};
+static const uint16_t POP_DURATIONS[8] = {1500, 1250, 1000, 750, 600, 500, 350, 275};
 
 /** @brief Flash all LEDs twice for LATE/MISS */
 static inline void feedback_late_or_miss(void) { led_flash(0xFF, 1, 100); }
@@ -167,7 +167,8 @@ void game_run(void) {
     rng_state = RNG_INIT_STATE;
 
     for (uint8_t lvl = 0; lvl < LVLS; lvl++) {
-        printf("\n%sLevel %d%s (Lives: %s%d%s)\n", GRN, lvl + 1, RST, YEL, lives, RST);
+        uint16_t duration_ms = POP_DURATIONS[lvl];
+        printf("\n%sLevel %d -> %d ms%s (Lives: %s%d%s)\n", GRN, lvl + 1, duration_ms, RST, YEL, lives, RST);
         game_run_level(lvl, POPS_PER_LVL[lvl]);
         if (lives == 0) {
             printf("\n%sGame Over!%s (Reached %sLevel %d%s)\n", RED, RST, GRN, lvl + 1, RST);
