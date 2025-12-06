@@ -1,6 +1,22 @@
+# Editors/IDEs
 .vscode/
+
+# C stuff
 build/
-*.log
 compile_flags.txt
-emb/msdk-proj.toml
+msdk-proj.toml
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Misc files
+*.log
 *.bak
