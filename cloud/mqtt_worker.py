@@ -15,7 +15,7 @@ from typing import Optional
 import paho.mqtt.client as mqtt
 
 from config import ConfigManager
-from models import ConfigUpdate, GameSession
+from models import ConfigUpdate, GamePopEvent, GameSession, StatusMessage, TelemetryBatch
 from storage import DataStore
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
@@ -25,17 +25,20 @@ MQTT_KEEPALIVE = 30
 # Topic templates
 EVENTS_TOPIC = "whac/+/events"  # + matches device_id
 CONFIG_REQ_TOPIC = "whac/+/config_request"
+GAME_EVENTS_TOPIC = "whac/+/game_events"
+TELEMETRY_TOPIC = "whac/+/telemetry/#"
+STATUS_TOPIC = "whac/+/status"
 COMMAND_TOPIC_FMT = "whac/{device_id}/commands"
 
 
 class MQTTBackend:
     """Handles MQTT subscriptions and message routing."""
 
-    def __init__(self, broker: str, port: int) -> None:
+    def __init__(self, broker: str, port: int, store: Optional[DataStore] = None) -> None:
         self.broker = broker
         self.port = port
         self.client = mqtt.Client()
-        self.store = DataStore()
+        self.store = store or DataStore()
         self.config = ConfigManager()
         self._stop_event = threading.Event()
         self._setup_handlers()
@@ -62,6 +65,9 @@ class MQTTBackend:
             print(f"[mqtt] Connected to broker {self.broker}:{self.port}")
             client.subscribe(EVENTS_TOPIC, qos=1)
             client.subscribe(CONFIG_REQ_TOPIC, qos=1)
+            client.subscribe(GAME_EVENTS_TOPIC, qos=1)
+            client.subscribe(TELEMETRY_TOPIC, qos=0)
+            client.subscribe(STATUS_TOPIC, qos=0)
         else:
             print(f"[mqtt] Connect failed with code {rc}")
 
@@ -73,21 +79,30 @@ class MQTTBackend:
         payload = msg.payload.decode("utf-8")
         print(f"[mqtt] Received on {topic}: {payload}")
         try:
-            device_id = self._extract_device_id(topic)
+            device_id, suffix = self._extract_topic_parts(topic)
         except ValueError:
             print(f"[mqtt] Ignoring topic with no device id: {topic}")
             return
 
-        if topic.endswith("/events"):
+        if suffix == "events":
             self._handle_event(device_id, payload)
-        elif topic.endswith("/config_request"):
+        elif suffix == "config_request":
             self._handle_config_request(device_id)
+        elif suffix == "game_events":
+            self._handle_game_event(device_id, payload)
+        elif suffix == "status":
+            self._handle_status(device_id, payload)
+        elif suffix.startswith("telemetry/"):
+            sensor = suffix.split("/", 1)[1]
+            self._handle_telemetry(device_id, sensor, payload)
 
-    def _extract_device_id(self, topic: str) -> str:
+    def _extract_topic_parts(self, topic: str) -> tuple[str, str]:
         parts = topic.split("/")
         if len(parts) < 3 or parts[0] != "whac":
             raise ValueError("invalid topic")
-        return parts[1]
+        device_id = parts[1]
+        suffix = "/".join(parts[2:])
+        return device_id, suffix
 
     def _handle_event(self, device_id: str, payload: str) -> None:
         try:
@@ -103,6 +118,36 @@ class MQTTBackend:
         print(
             f"[mqtt] Stored session {session.session_id} for {session.device_id} score={session.total_score}"
         )
+
+    def _handle_game_event(self, device_id: str, payload: str) -> None:
+        try:
+            data = json.loads(payload)
+            data.setdefault("device_id", device_id)
+            event = GamePopEvent.model_validate(data)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[mqtt] Failed to parse game_event payload: {exc}")
+            return
+        self.store.add_game_event(device_id, event)
+
+    def _handle_status(self, device_id: str, payload: str) -> None:
+        try:
+            data = json.loads(payload)
+            data.setdefault("device_id", device_id)
+            status = StatusMessage.model_validate(data)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[mqtt] Failed to parse status payload: {exc}")
+            return
+        self.store.update_status(device_id, status)
+
+    def _handle_telemetry(self, device_id: str, sensor: str, payload: str) -> None:
+        try:
+            data = json.loads(payload)
+            data.setdefault("device_id", device_id)
+            batch = TelemetryBatch.model_validate(data)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[mqtt] Failed to parse telemetry payload for {sensor}: {exc}")
+            return
+        self.store.add_telemetry(device_id, sensor, batch)
 
     def _handle_config_request(self, device_id: str) -> None:
         cfg = self.config.get(device_id)

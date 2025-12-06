@@ -63,3 +63,40 @@ class Stats(BaseModel):
     total_players: int
     best_score: Optional[int]
     average_score: Optional[float]
+
+
+class GamePopEvent(BaseModel):
+    """Per-pop live event sent during gameplay."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    device_id: Optional[str] = None
+    pop: int = Field(ge=0)
+    level: int = Field(ge=0)
+    outcome: str
+    reaction_ms: int = Field(ge=0)
+    lives_left: int = Field(ge=0)
+    ts: int = Field(ge=0)  # ms since epoch
+
+
+class StatusMessage(BaseModel):
+    """Heartbeat/status published every few seconds."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    device_id: Optional[str] = None
+    state: str
+    level: int = Field(ge=0)
+    pop_index: int = Field(ge=0)
+    lives_left: int = Field(ge=0)
+    ts: int = Field(ge=0)
+
+
+class TelemetryBatch(BaseModel):
+    """Small batch of sensor readings."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    device_id: Optional[str] = None
+    samples: List
+    ts: int = Field(ge=0)

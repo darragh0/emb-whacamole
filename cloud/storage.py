@@ -5,11 +5,14 @@ import os
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 import fcntl
 
-from models import GameSession, LeaderboardEntry, Stats
+from models import GamePopEvent, GameSession, LeaderboardEntry, Stats, StatusMessage, TelemetryBatch
+
+LIVE_EVENT_LIMIT = 200
+TELEMETRY_LIMIT = 200
 
 
 class DataStore:
@@ -22,6 +25,9 @@ class DataStore:
         base = Path(__file__).parent
         self.path = Path(path) if path else base / "data" / "store.json"
         self.sessions: List[GameSession] = []
+        self.live_events: Dict[str, List[GamePopEvent]] = {}
+        self.status: Dict[str, StatusMessage] = {}
+        self.telemetry: Dict[Tuple[str, str], List[TelemetryBatch]] = {}
         self._lock = threading.Lock()
         self.load()
 
@@ -61,6 +67,55 @@ class DataStore:
                     return
             self.sessions.append(session)
             self.save()
+
+    def _append_bounded(self, buf: List, item, limit: int) -> None:
+        buf.append(item)
+        if len(buf) > limit:
+            # Drop oldest to cap memory.
+            del buf[0 : len(buf) - limit]
+
+    def add_game_event(self, device_id: str, event: GamePopEvent) -> None:
+        """Store recent live events per device (not persisted to disk)."""
+        with self._lock:
+            buf = self.live_events.setdefault(device_id, [])
+            self._append_bounded(buf, event, LIVE_EVENT_LIMIT)
+
+    def recent_game_events(self, device_id: str, limit: int = 50) -> List[GamePopEvent]:
+        with self._lock:
+            if device_id not in self.live_events:
+                return []
+            return list(self.live_events[device_id][-limit:])
+
+    def recent_all_game_events(self, limit: int = 200) -> List[GamePopEvent]:
+        with self._lock:
+            collected: List[GamePopEvent] = []
+            for events in self.live_events.values():
+                collected.extend(events)
+            collected.sort(key=lambda e: e.ts)
+            return collected[-limit:]
+
+    def update_status(self, device_id: str, status: StatusMessage) -> None:
+        with self._lock:
+            self.status[device_id] = status
+
+    def get_status(self, device_id: str) -> Optional[StatusMessage]:
+        with self._lock:
+            return self.status.get(device_id)
+
+    def add_telemetry(self, device_id: str, sensor: str, batch: TelemetryBatch) -> None:
+        key = (device_id, sensor)
+        with self._lock:
+            buf = self.telemetry.setdefault(key, [])
+            self._append_bounded(buf, batch, TELEMETRY_LIMIT)
+
+    def recent_telemetry(
+        self, device_id: str, sensor: str, limit: int = 50
+    ) -> List[TelemetryBatch]:
+        key = (device_id, sensor)
+        with self._lock:
+            if key not in self.telemetry:
+                return []
+            return list(self.telemetry[key][-limit:])
 
     def leaderboard(self, limit: int = 10) -> List[LeaderboardEntry]:
         with self._lock:

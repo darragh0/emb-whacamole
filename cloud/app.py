@@ -1,12 +1,15 @@
 """Leaderboard UI and stats for the Whac-a-Mole embedded project.
 Device ingestion happens over MQTT (see mqtt_worker.py)."""
 
+import asyncio
+import json
 from datetime import datetime
+from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 
 from storage import DataStore
 
@@ -130,6 +133,41 @@ def leaderboard_page(request: Request, limit: int = 20) -> HTMLResponse:
     </html>
     """
     return HTMLResponse(content=html)
+
+
+@app.get("/api/events/stream")
+async def stream_events(device_id: Optional[str] = None):
+    """
+    Optional Server-Sent Events endpoint streaming recent live game_events.
+    Works best when mqtt_worker and this app share the same DataStore instance
+    (e.g. same process) or when game_events are fed into this process.
+    """
+
+    async def event_generator():
+        last_ts = 0
+        while True:
+            events = (
+                store.recent_game_events(device_id, limit=200)
+                if device_id
+                else store.recent_all_game_events(limit=200)
+            )
+            new_events = [e for e in events if e.ts > last_ts]
+            if new_events:
+                last_ts = max(e.ts for e in new_events)
+                for event in new_events:
+                    payload = {
+                        "device_id": event.device_id or device_id,
+                        "pop": event.pop,
+                        "level": event.level,
+                        "outcome": event.outcome,
+                        "reaction_ms": event.reaction_ms,
+                        "lives_left": event.lives_left,
+                        "ts": event.ts,
+                    }
+                    yield f"data: {json.dumps(payload)}\n\n"
+            await asyncio.sleep(1.0)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 if __name__ == "__main__":

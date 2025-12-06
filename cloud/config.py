@@ -18,6 +18,12 @@ DEFAULT_CONFIG: Dict[str, object] = {
     "game_duration_ms": 60_000,
     "mole_up_ms": 1_200,
     "send_events": True,
+    "set_level": None,
+    "set_lives": None,
+    "set_pop_duration": None,
+    "pause": False,
+    "resume": False,
+    "sensor_config": {},
 }
 
 
