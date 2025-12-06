@@ -25,7 +25,7 @@
 # **********************************************************
 
 PROJECT=emb
-BOARD=EvKit_V1
+BOARD=FTHR_Apps_P1
 TARGET=MAX32655
 
 # Add any additional configs here!

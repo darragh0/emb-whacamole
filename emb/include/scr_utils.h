@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdio.h>
 
 /** @brief Screen utilities for the Whac-A-Mole serial console output */
 
@@ -15,26 +16,14 @@
 #define BLD "\033[1m"
 #define DIM "\033[2m"
 #define ITL "\033[3m"
-#define UND "\033[4m"
 
 #define RST "\033[0m"
 
 /** @brief Hide cursor */
-void curhide(void);
+static inline void curhide(void) { printf("\033[?25l"); }
 
 /** @brief Clear screen */
-void cls(void);
-
-/**
- * @brief Print a message in a given color/style
- *
- * @param msg Message to print
- * @param n_clrs No. of colors/styles to print
- * @param ... Colors/styles
- *
- * @see macros in scr_utils.h
- */
-void cprintf(const char* msg, const int n_clrs, ...);
+static inline void cls(void) { printf("\033[2J\033[H"); }
 
 /**
  * @brief Print error message

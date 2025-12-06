@@ -1,12 +1,20 @@
 #include "io_expander.h"
-
+#include <i2c.h>
+#include <mxc_errors.h>
+#include <stdbool.h>
 #include <stdint.h>
 
-#include "i2c.h"
-#include "mxc_errors.h"
-#include "stdbool.h"
-
-static int _mk_i2c_master_tx(const unsigned int addr, uint8_t* const buf, const bool write) {
+/**
+ * @brief Send a single byte over I2C
+ *
+ * @param addr I2C address
+ * @param buf Byte to send
+ * @param write true to write, false to read
+ *
+ * @return E_SUCCESS on success, else error code
+ * @see mxc_errors.h
+ */
+static int mk_i2c_master_tx(const unsigned int addr, uint8_t* const buf, const bool write) {
     mxc_i2c_req_t tx_details = {
         .i2c = I2C_MASTER,
         .addr = addr,
@@ -36,18 +44,18 @@ int io_expander_init(void) {
 
     // Wake up buttons/leds
     uint8_t initial_btn_state = BTN_HW_STATE;
-    int errno3 = _mk_i2c_master_tx(ADDR_IN, &initial_btn_state, true);
+    int errno3 = mk_i2c_master_tx(ADDR_IN, &initial_btn_state, true);
     if (errno3 != E_SUCCESS) {
         MXC_I2C_Shutdown(I2C_MASTER);
         return errno3;
     }
 
     uint8_t initial_led_state = LED_HW_STATE;
-    return _mk_i2c_master_tx(ADDR_OUT, &initial_led_state, true);
+    return mk_i2c_master_tx(ADDR_OUT, &initial_led_state, true);
 }
 
 int io_expander_deinit(void) { return MXC_I2C_Shutdown(I2C_MASTER); }
 
-int io_expander_read_btns(uint8_t* const button_state) { return _mk_i2c_master_tx(ADDR_IN, button_state, false); }
+int io_expander_read_btns(uint8_t* const button_state) { return mk_i2c_master_tx(ADDR_IN, button_state, false); }
 
-int io_expander_write_leds(uint8_t led_pattern) { return _mk_i2c_master_tx(ADDR_OUT, &led_pattern, true); }
+int io_expander_write_leds(uint8_t led_pattern) { return mk_i2c_master_tx(ADDR_OUT, &led_pattern, true); }
