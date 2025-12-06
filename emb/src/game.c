@@ -173,7 +173,7 @@ static pop_outcome_t pop_do(
 
     // Poll loop with timeout
     uint16_t elapsed = 0;
-    const uint8_t poll_interval = 10;
+    const uint8_t poll_interval = 5;
 
     while (elapsed < duration_ms) {
         check_pause(); // Handle pause during pop
@@ -208,23 +208,23 @@ static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
         uint16_t reaction_ms;
         pop_outcome_t outcome = pop_do(lvl_idx, &rng_state, &mole, &reaction_ms);
 
-        printf("  Pop %02d :: ", pop + 1);
+        // printf("  Pop %02d :: ", pop + 1);
         switch (outcome) {
             case POP_HIT:
-                printf("[HIT]  %3d ms\n", reaction_ms);
+                // printf("[HIT]  %3d ms\n", reaction_ms);
                 emit_pop_result(mole, outcome, reaction_ms, lvl_idx);
                 continue;
             case POP_MISS:
-                printf("[MISS]");
+                // printf("[MISS]");
                 break;
             case POP_LATE:
-                printf("[LATE]");
+                // printf("[LATE]");
                 break;
         }
 
         lives--;
         emit_pop_result(mole, outcome, reaction_ms, lvl_idx);
-        printf("      (Lives: %d)\n", lives);
+        // printf("      (Lives: %d)\n", lives);
         feedback_late_or_miss();
         if (lives == 0) return;
     }
@@ -233,7 +233,7 @@ static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
 }
 
 int await_start(void) {
-    printf("Awaiting button press ...\n");
+    // printf("Awaiting button press ...\n");
 
     uint8_t btn_state = BTN_HW_STATE;
     while (true) {
@@ -268,10 +268,10 @@ void game_run(void) {
 
     for (uint8_t lvl = 0; lvl < LVLS; lvl++) {
         uint16_t duration_ms = POP_DURATIONS[lvl];
-        printf("\nLevel %d  |  %d ms  |  Lives: %d\n", lvl + 1, duration_ms, lives);
+        // printf("\nLevel %d  |  %d ms  |  Lives: %d\n", lvl + 1, duration_ms, lives);
         game_run_level(lvl, POPS_PER_LVL[lvl]);
         if (lives == 0) {
-            printf("\nGame Over! (Reached Level %d)\n", lvl + 1);
+            // printf("\nGame Over! (Reached Level %d)\n", lvl + 1);
             emit_session_end(false);
             MS_SLEEP(500);
             feedback_game_over();
@@ -279,7 +279,7 @@ void game_run(void) {
         }
     }
 
-    printf("\nCongratulations! Completed all %d levels with %d lives remaining!\n", LVLS, lives);
+    // printf("\nCongratulations! Completed all %d levels with %d lives remaining!\n", LVLS, lives);
     emit_session_end(true);
     MS_SLEEP(500);
     feedback_win();

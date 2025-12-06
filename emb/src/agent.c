@@ -40,12 +40,14 @@ static void send_event_json(const game_event_t* event) {
 
         case EVENT_LEVEL_COMPLETE:
             printf(
-                "{\"event_type\":\"level_complete\",\"lvl\":%u}\n", event->data.level_complete.level
+                "{\"event_type\":\"lvl_complete\",\"lvl\":%u}\n", event->data.level_complete.level
             );
             break;
 
         case EVENT_SESSION_END:
-            printf("{\"event_type\":\"session_end\",\"w\":%s}\n", TF(event->data.session_end.won));
+            printf(
+                "{\"event_type\":\"session_end\",\"win\":%s}\n", TF(event->data.session_end.won)
+            );
             break;
     }
     fflush(stdout);
@@ -57,7 +59,7 @@ static void send_event_json(const game_event_t* event) {
  * @param line Line to process
  */
 static void process_rx_line(const char* line) {
-    if (strstr(line, "\"c\":\"pause\"") != NULL) {
+    if (strstr(line, "\"command\":\"pause\"") != NULL) {
         agent_command_t cmd = {.type = CMD_PAUSE};
         xQueueSend(cmd_queue, &cmd, 0);
     }

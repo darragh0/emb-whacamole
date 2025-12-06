@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "std": {
+      "()": "logging_conf.StdFormatter",
+      "fmt": "<color>[%(levelname).3s]</color> [%(asctime)s] :: <color_if_err>%(message)s</color_if_err>",
+      "datefmt": "%X"
+    }
+  },
+  "filters": {
+    "dismiss_errors": {
+      "()": "logging_conf.DismissErrorsFilter"
+    }
+  },
+  "handlers": {
+    "stdout": {
+      "level": "DEBUG",
+      "class": "logging.StreamHandler",
+      "stream": "ext://sys.stdout",
+      "formatter": "std",
+      "filters": ["dismiss_errors"]
+    },
+    "stderr": {
+      "level": "WARNING",
+      "class": "logging.StreamHandler",
+      "stream": "ext://sys.stderr",
+      "formatter": "std"
+    }
+  },
+  "loggers": {
+    "root": {
+      "level": "INFO",
+      "handlers": ["stdout", "stderr"]
+    }
+  }
+}

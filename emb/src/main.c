@@ -5,7 +5,6 @@
 #include "task.h"
 #include "utils.h"
 #include <mxc_errors.h>
-#include <stdio.h>
 
 // Task priorities: Game is higher so it runs without blocking on agent
 #define GAME_TASK_PRIORITY (tskIDLE_PRIORITY + 3)
@@ -47,18 +46,12 @@ static long init_all(void) {
     return INIT_SUCCESS;
 }
 
-static inline void prog_welcome(void) {
-    printf("\033[?25l\033[2J\033[H\n===== Whac-A-Mole =====\n");
-}
-
 int main(void) {
     // Delay loop to prevent bricking
     for (volatile int _i = 0; _i < 0x3FFFFF; _i++);
-    prog_welcome();
 
     long err = init_all();
     if (err != INIT_SUCCESS) return err;
 
-    puts("Starting scheduler ...");
     vTaskStartScheduler();
 }
