@@ -3,3 +3,4 @@ build/
 *.log
 compile_flags.txt
 emb/msdk-proj.toml
+*.bak

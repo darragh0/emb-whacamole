@@ -2,10 +2,12 @@
 #include "btns.h"
 #include "io_expander.h"
 #include "leds.h"
-#include "scr_utils.h"
+#include "rtos_queues.h"
 #include "utils.h"
 #include <stdint.h>
 #include <stdio.h>
+
+volatile bool game_paused = false;
 
 static uint8_t lives;
 static uint32_t rng_state;
@@ -13,16 +15,109 @@ static uint32_t rng_state;
 static const uint8_t POPS_PER_LVL[8] = {[0 ... 7] = 10};
 static const uint16_t POP_DURATIONS[8] = {1500, 1250, 1000, 750, 600, 500, 350, 275};
 
-/** @brief Flash all LEDs twice for LATE/MISS */
+/** @brief Queue a session start event */
+static void emit_session_start(void) {
+    game_event_t event = {
+        .type = EVENT_SESSION_START,
+        .timestamp = xTaskGetTickCount(),
+    };
+    xQueueSend(event_queue, &event, 0);
+}
+
+/**
+ * @brief Queue a pop result event
+ *
+ * @param mole Mole index
+ * @param outcome Outcome of the pop
+ * @param reaction_ms Reaction time in ms
+ * @param lvl Current level
+ */
+static void
+emit_pop_result(uint8_t mole, pop_outcome_t outcome, uint16_t reaction_ms, uint8_t lvl) {
+    game_event_t event = {
+        .type = EVENT_POP_RESULT,
+        .timestamp = xTaskGetTickCount(),
+        .data.pop = {
+            .mole = mole,
+            .outcome = outcome,
+            .reaction_ms = reaction_ms,
+            .lives = lives,
+            .level = lvl + 1,
+        },
+    };
+    xQueueSend(event_queue, &event, 0);
+}
+
+/**
+ * @brief Queue a level complete event
+ *
+ * @param lvl Current level
+ */
+static void emit_level_complete(uint8_t lvl) {
+    game_event_t event = {
+        .type = EVENT_LEVEL_COMPLETE,
+        .timestamp = xTaskGetTickCount(),
+        .data.level_complete.level = lvl + 1,
+    };
+    xQueueSend(event_queue, &event, 0);
+}
+
+/**
+ * @brief Queue a session end event
+ *
+ * @param won Whether session was won
+ */
+static void emit_session_end(bool won) {
+    game_event_t event = {
+        .type = EVENT_SESSION_END,
+        .timestamp = xTaskGetTickCount(),
+        .data.session_end.won = won,
+    };
+    xQueueSend(event_queue, &event, 0);
+}
+
+/** @brief Advance the pause animation (alternating LEDs) */
+static void pause_animation_step(void) {
+    static uint8_t pattern = 0xAA; // 10101010
+    io_expander_write_leds(pattern);
+    pattern = ~pattern; // Toggle to 01010101
+}
+
+/** @brief Poll command queue for pause command & handle pause state loop */
+static void check_pause(void) {
+    agent_command_t cmd;
+    while (xQueueReceive(cmd_queue, &cmd, 0) == pdTRUE) {
+        if (cmd.type == CMD_PAUSE) {
+            game_paused = !game_paused;
+        }
+    }
+
+    while (game_paused) {
+        pause_animation_step();
+        MS_SLEEP(200);
+
+        // Check for unpause
+        if (xQueueReceive(cmd_queue, &cmd, 0) == pdTRUE && cmd.type == CMD_PAUSE) {
+            game_paused = false;
+            led_hw_write(); // Clear LEDs
+        }
+    }
+}
+
+/** @brief Flash LEDs for late/miss feedback */
 static inline void feedback_late_or_miss(void) { led_flash(0xFF, 1, 100); }
 
-/** @brief Flash all LEDs 3 times for GAME OVER */
+/** @brief Flash LEDs for game over feedback */
 static inline void feedback_game_over(void) { led_flash(0xFF, 3, 500); }
 
-/** @brief Flash all LEDs 100 times for WIN */
-static void feedback_win(void) { led_flash(0xFF, 100, 50); }
+/** @brief Flash LEDs for win feedback */
+static inline void feedback_win(void) { led_flash(0xFF, 100, 50); }
 
-/** @brief Display level number with N LEDs */
+/**
+ * @brief Show level start animation
+ *
+ * @param lvl_idx Level index
+ */
 static void lvl_show(const uint8_t lvl_idx) {
     uint8_t num_leds = lvl_idx + 1;
     uint8_t led_pattern = 0x00;
@@ -34,25 +129,30 @@ static void lvl_show(const uint8_t lvl_idx) {
     MS_SLEEP(500);
 }
 
-/**
- * @brief Random delay between pops (250-1000ms)
- *
- * @param rng_state RNG state
- */
+/** @brief Wait a random amount of time before next pop */
 static void pop_wait_delay(uint32_t* const rng_state) {
     uint32_t delay = 250 + (next_rand(rng_state) % 751);
     MS_SLEEP(delay);
 }
 
 /**
- * @brief Execute a single pop, return outcome
+ * @brief Execute a single pop logic
  *
- * @param lvl_idx Level index
- * @param rng_state RNG state
+ * @param lvl_idx Current level index
+ * @param rng_state RNG state pointer
+ * @param out_mole [out] Selected mole index
+ * @param out_reaction_ms [out] Reaction time in ms
+ * @return Outcome of the pop
  */
-static pop_outcome_t pop_do(const uint8_t lvl_idx, uint32_t* const rng_state) {
+static pop_outcome_t pop_do(
+    const uint8_t lvl_idx,
+    uint32_t* const rng_state,
+    uint8_t* out_mole,
+    uint16_t* out_reaction_ms
+) {
     uint16_t duration_ms = POP_DURATIONS[lvl_idx];
     uint8_t target_led = next_rand(rng_state) % LED_COUNT;
+    *out_mole = target_led;
 
     // Button debounce: wait for all buttons released
     uint8_t btn_state;
@@ -76,10 +176,12 @@ static pop_outcome_t pop_do(const uint8_t lvl_idx, uint32_t* const rng_state) {
     const uint8_t poll_interval = 10;
 
     while (elapsed < duration_ms) {
+        check_pause(); // Handle pause during pop
+
         io_expander_read_btns(&btn_state);
 
-        // Check if any button pressed
         if (btn_state != BTN_HW_STATE) {
+            *out_reaction_ms = elapsed;
             led_hw_write();
             return is_btn_pressed(target_led, btn_state) ? POP_HIT : POP_MISS;
         }
@@ -88,54 +190,51 @@ static pop_outcome_t pop_do(const uint8_t lvl_idx, uint32_t* const rng_state) {
         elapsed += poll_interval;
     }
 
-    // Timeout - turn off LED
+    *out_reaction_ms = duration_ms;
     led_hw_write();
     return POP_LATE;
 }
 
-/**
- * @brief Run a single level
- *
- * @param lvl_idx Level index
- * @param pops Number of pops for this level
- */
+/** @brief Run a complete level */
 static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
     lvl_show(lvl_idx);
 
     for (int pop = 0; pop < pops; pop++) {
+        check_pause();
         pop_wait_delay(&rng_state);
+        check_pause();
 
-        pop_outcome_t outcome = pop_do(lvl_idx, &rng_state);
-        printf("  %sPop %s%02d%s :: ", ITL, GRN, pop + 1, RST);
+        uint8_t mole;
+        uint16_t reaction_ms;
+        pop_outcome_t outcome = pop_do(lvl_idx, &rng_state, &mole, &reaction_ms);
+
+        printf("  Pop %02d :: ", pop + 1);
         switch (outcome) {
             case POP_HIT:
-                printf("%s[HIT]%s\n", GRN, RST);
+                printf("[HIT]  %3d ms\n", reaction_ms);
+                emit_pop_result(mole, outcome, reaction_ms, lvl_idx);
                 continue;
             case POP_MISS:
-                printf("%s[MISS]", RED);
-                goto err;
+                printf("[MISS]");
+                break;
             case POP_LATE:
-                printf("%s[LATE]", YEL);
-                goto err;
+                printf("[LATE]");
+                break;
         }
 
-    err:
         lives--;
-        printf("%s   %s(Lives: %s%d%s%s)%s\n", RST, DIM, YEL, lives, RST, DIM, RST);
+        emit_pop_result(mole, outcome, reaction_ms, lvl_idx);
+        printf("      (Lives: %d)\n", lives);
         feedback_late_or_miss();
         if (lives == 0) return;
     }
-}
 
-void welcome(void) {
-    curhide();
-    cls();
-    fflush(stdout);
-    printf("===== %sWhac-A-Mole%s =====\n\n", CYN, RST);
-    printf("%s%sAwaiting button press ...%s\n", ITL, CYN, RST);
+    emit_level_complete(lvl_idx);
 }
 
 int await_start(void) {
+    printf("Awaiting button press ...\n");
+
     uint8_t btn_state = BTN_HW_STATE;
     while (true) {
         uint8_t led_pattern = 0;
@@ -165,20 +264,33 @@ success:
 void game_run(void) {
     lives = LIVES;
     rng_state = RNG_INIT_STATE;
+    emit_session_start();
 
     for (uint8_t lvl = 0; lvl < LVLS; lvl++) {
         uint16_t duration_ms = POP_DURATIONS[lvl];
-        printf("\n%sLevel %d -> %d ms%s (Lives: %s%d%s)\n", GRN, lvl + 1, duration_ms, RST, YEL, lives, RST);
+        printf("\nLevel %d  |  %d ms  |  Lives: %d\n", lvl + 1, duration_ms, lives);
         game_run_level(lvl, POPS_PER_LVL[lvl]);
         if (lives == 0) {
-            printf("\n%sGame Over!%s (Reached %sLevel %d%s)\n", RED, RST, GRN, lvl + 1, RST);
+            printf("\nGame Over! (Reached Level %d)\n", lvl + 1);
+            emit_session_end(false);
             MS_SLEEP(500);
             feedback_game_over();
             return;
         }
     }
 
-    printf("\nCongratulations! Completed all 8 levels with %s%d%s lives remaining!\n", GRN, lives, RST);
+    printf("\nCongratulations! Completed all %d levels with %d lives remaining!\n", LVLS, lives);
+    emit_session_end(true);
     MS_SLEEP(500);
     feedback_win();
+}
+
+void game_task(void* param) {
+    (void)param;
+
+    while (true) {
+        await_start();
+        game_run();
+        MS_SLEEP(2000); // Pause before next game
+    }
 }

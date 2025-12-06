@@ -28,4 +28,5 @@ PROJECT=emb
 BOARD=FTHR_Apps_P1
 TARGET=MAX32655
 
-# Add any additional configs here!
+# Enable FreeRTOS
+LIB_FREERTOS=1

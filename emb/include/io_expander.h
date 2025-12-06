@@ -1,16 +1,17 @@
-#pragma once
-
-#include <mxc_errors.h>
-#include <stdbool.h>
-#include <stdint.h>
-
 /**
- * @brief io_expander = MAX7325 "Pin Multiplier" Chip
+ * @details
+ * io_expander: MAX7325 "Pin Multiplier" Chip
  *
  * This chip adds 16 new plugs (using I2C) with:
  * - 8 inputs pins (buttons)
  * - 8 output pins (LEDs)
  */
+
+#pragma once
+
+#include <mxc_errors.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 #define I2C_MASTER MXC_I2C2
 #define I2C_FREQ MXC_I2C_STD_MODE

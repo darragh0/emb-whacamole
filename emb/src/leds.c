@@ -3,7 +3,6 @@
 #include "utils.h"
 #include <stdint.h>
 
-// Weird ahh board pins are scrambled
 const uint8_t LED_MAP[] = {
     [0] = 0,
     [1] = 2,
@@ -15,7 +14,7 @@ const uint8_t LED_MAP[] = {
     [7] = 6,
 };
 
-void led_flash(uint8_t led_pattern, const uint8_t n_flashes, const uint32_t ms) {
+void led_flash(const uint8_t led_pattern, const uint8_t n_flashes, const uint32_t ms) {
     for (uint8_t i = 0; i < n_flashes; i++) {
         io_expander_write_leds(led_pattern);
         MS_SLEEP(ms);

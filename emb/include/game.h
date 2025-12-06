@@ -1,23 +1,28 @@
+/** @brief Game logic **/
+
 #pragma once
 
-/** @brief Whac-A-Mole game entry point */
+#include <stdbool.h>
 
 #define LVLS 8
 #define LIVES 5
 #define RNG_INIT_STATE 0xDEADBEEF
 
-/** @brief Pop outcome states */
+/** @brief Outcome of a single mole pop */
 typedef enum {
-    POP_HIT,
-    POP_MISS,
-    POP_LATE,
+    POP_HIT = 0,
+    POP_MISS = 1,
+    POP_LATE = 2,
 } pop_outcome_t;
 
-/** @brief Welcome message */
-void welcome(void);
+// Pause state (set by agent task via cmd_queue)
+extern volatile bool game_paused;
 
-/** @brief Await start of game (wait until any button pressed) */
+/** @brief Wait for start button press */
 int await_start(void);
 
-/** @brief Run the complete game (all levels) */
+/** @brief Run main game loop */
 void game_run(void);
+
+/** @brief FreeRTOS task entry point (wraps welcome/await_start/game_run in a loop) **/
+void game_task(void* param);

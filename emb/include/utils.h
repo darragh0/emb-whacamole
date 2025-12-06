@@ -1,15 +1,28 @@
+/** @brief Miscellaneous utilities **/
+
 #pragma once
 
-#include <mxc_delay.h>
+#include "FreeRTOS.h"
+#include "task.h"
+#include <stdint.h>
 
-#define MS_SLEEP(ms) MXC_Delay(MXC_DELAY_MSEC(ms))
-#define S_SLEEP(s) MXC_Delay(MXC_DELAY_SEC(s))
+#define TF(b) ((b) ? "true" : "false")
+
+#define MS_SLEEP(ms) vTaskDelay(pdMS_TO_TICKS(ms))
 
 /**
- * @brief Random number generator using simple xorshift
+ * @brief Get the next random number
  *
  * @param state Random number generator state
  *
- * @return Random number
- * */
+ * @return Next random number
+ */
 uint32_t next_rand(uint32_t* const state);
+
+/**
+ * @brief Print error message to stderr
+ *
+ * @param msg Error message
+ * @param errno Error number/code
+ */
+void eputs(const char* const msg, const long errno);

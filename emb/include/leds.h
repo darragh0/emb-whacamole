@@ -1,3 +1,5 @@
+/** @brief LED-related utilities */
+
 #pragma once
 
 #include "io_expander.h"
@@ -5,9 +7,8 @@
 
 #define LED_COUNT 8
 
+/** @brief Map logical LED index (0-7) to hardware pin number */
 extern const uint8_t LED_MAP[];
-
-/** @brief LED-related utilities */
 
 /**
  * @brief Update led_pattern to turn on a given LED
@@ -45,4 +46,4 @@ static inline void led_hw_write(void) { io_expander_write_leds(LED_HW_STATE); }
  * @param n_flashes How many times to flash
  * @param ms How many ms to flash for each time
  */
-void led_flash(uint8_t led_pattern, const uint8_t n_flashes, const uint32_t ms);
+void led_flash(const uint8_t led_pattern, const uint8_t n_flashes, const uint32_t ms);

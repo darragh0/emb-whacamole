@@ -1,12 +1,13 @@
+/** @brief Button-related utilities **/
+
 #pragma once
 
 #include <stdbool.h>
 #include <stdint.h>
 
-/** @brief Button-related utilities **/
-
 #define BTN_COUNT 8
 
+/** @brief Map logical button index (0-7) to hardware pin number */
 extern const uint8_t BTN_MAP[];
 
 /**

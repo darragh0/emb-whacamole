@@ -1,5 +1,6 @@
 #include "utils.h"
 #include <stdint.h>
+#include <stdio.h>
 
 uint32_t next_rand(uint32_t* const state) {
     uint32_t x = *state;
@@ -9,3 +10,5 @@ uint32_t next_rand(uint32_t* const state) {
     *state = x;
     return x;
 }
+
+void eputs(const char* const msg, const long errno) { fprintf(stderr, "error: %s (%ld)\n", msg, errno); }

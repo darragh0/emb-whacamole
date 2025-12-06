@@ -7,7 +7,7 @@ IndentCaseLabels: true
 
 ContinuationIndentWidth: 4                                # No. spaces used for line continuations (wrapped lines)
 
-ColumnLimit: 120                                          # Max. line length before automatic wrapping (0 = no limit)
+ColumnLimit: 100                                          # Max. line length before automatic wrapping (0 = no limit)
 
 AlignAfterOpenBracket: BlockIndent                        # How to align args after opening bracket:
                                                           # BlockIndent: Use continuation indent, add line break after opening & before closing bracket
