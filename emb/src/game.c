@@ -5,7 +5,6 @@
 #include "rtos_queues.h"
 #include "utils.h"
 #include <stdint.h>
-#include <stdio.h>
 
 volatile bool game_paused = false;
 
