@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+import time
+from typing import TYPE_CHECKING, Any, Final, cast
 
 from paho.mqtt.client import Client, MQTTMessage
 from serial import Serial, SerialException
 
 if TYPE_CHECKING:
     from logging import Logger
+
+RECONNECT_TIMEOUT_SECS: Final = 600
+RECONNECT_RETRY_INTERVAL: Final = 2  # secs
 
 
 class Bridge:
@@ -42,7 +46,7 @@ class Bridge:
         self.device_id = device_id
 
         self._log = logging.getLogger("Bridge")
-        self._serial = None
+        self._serial = None  # Initialize later in `self.run`
         self._mqtt = Client(client_id=f"agent-{device_id}")
         self._mqtt.on_message = self._on_message
 
@@ -68,19 +72,21 @@ class Bridge:
             self._read_events()
         finally:
             self._mqtt.loop_stop()
-            if self._serial is not None:
-                self._serial.close()
+            self._serial.close()
             self._log.info("Shutdown complete")
 
     def _read_events(self) -> None:
         """Read and process events from serial port."""
 
-        while self._serial:
+        while True:
             try:
-                line_bytes = self._serial.readline()
+                line_bytes = cast("Serial", self._serial).readline()
             except SerialException as e:
                 self._log.error("Serial read error: %s", e)
-                break
+                cast("Serial", self._serial).close()
+                if not self._wait_for_reconnect():
+                    break
+                continue
 
             if not line_bytes:
                 continue
@@ -88,6 +94,27 @@ class Bridge:
             line = line_bytes.decode("utf-8", errors="replace").strip()
             if line.startswith("{"):
                 self._process_event(line)
+
+    def _wait_for_reconnect(self) -> bool:
+        """Wait for serial device to reconnect. Returns True if reconnected."""
+        start = time.monotonic()
+
+        self._log.info(
+            "Waiting for device to reconnect (timeout: %ds)...",
+            RECONNECT_TIMEOUT_SECS,
+        )
+
+        while time.monotonic() - start < RECONNECT_TIMEOUT_SECS:
+            try:
+                self._serial = Serial(self.serial_port, self.baud_rate, timeout=0.1)
+            except SerialException:
+                time.sleep(RECONNECT_RETRY_INTERVAL)
+            else:
+                self._log.info("Reconnected to %s", self.serial_port)
+                return True
+
+        self._log.error("Reconnect timeout after %ds", RECONNECT_TIMEOUT_SECS)
+        return False
 
     def _process_event(self, jsonl: str) -> None:
         """Process and publish a JSON event from the device."""
@@ -104,10 +131,8 @@ class Bridge:
     def _on_message(self, client: Client, userdata: Any, message: MQTTMessage) -> None:  # noqa: ANN401
         """Forward MQTT command to serial device as single-byte command."""
         _ = client, userdata
-        if self._serial is None:
-            return
 
         cmd = message.payload.decode().strip()
         if cmd == "P":
             self._log.info("[MQTT -> Device] %s", cmd)
-            self._serial.write(b"P")
+            cast("Serial", self._serial).write(b"P")
