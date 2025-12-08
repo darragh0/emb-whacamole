@@ -30,11 +30,11 @@ def _mk_parser() -> ArgumentParser:
         "--baud",
         type=int,
         default=115200,
-        help="serial baud rate (default: 115200)",
+        help="baud rate (default: 115200)",
         dest="baud_rate",
-        metavar="R",
+        metavar="RATE",
     )
-    arg("--device-id", default="whacamole-dev", help="device ID (default: whacamole-dev)", metavar="ID")
+    arg("--device-id", default="whacamole-dev", help='device ID (default: "whacamole-dev")', metavar="ID")
     arg(
         "--mqtt-host",
         default=os.getenv("MQTT_BROKER", "localhost"),

@@ -20,3 +20,9 @@ wheels/
 # Misc files
 *.log
 *.bak
+
+# Sensitive
+*.env
+
+# Program data
+cloud/data/

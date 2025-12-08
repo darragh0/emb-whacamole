@@ -16,6 +16,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import paho.mqtt.client as mqtt
 from serial import Serial, SerialException
 
+RECONNECT_TIMEOUT_SECS = 600
+RECONNECT_RETRY_INTERVAL = 2  # seconds
+
 GAME_EVENTS_TOPIC = "whac/{device_id}/game_events"
 STATUS_TOPIC = "whac/{device_id}/status"
 TELEMETRY_TOPIC = "whac/{device_id}/telemetry/{sensor}"
@@ -122,8 +125,10 @@ class Bridge:
                 line_bytes = self._serial.readline()
             except SerialException as exc:
                 self._log.error("Serial read error: %s", exc)
-                self._stop_event.set()
-                break
+                if not self._wait_for_reconnect():
+                    self._stop_event.set()
+                    break
+                continue
 
             if not line_bytes:
                 continue
@@ -139,6 +144,23 @@ class Bridge:
                 continue
 
             self._handle_uart_message(msg)
+
+    def _wait_for_reconnect(self) -> bool:
+        """Wait for serial device to reconnect. Returns True if reconnected."""
+        start = time.monotonic()
+        self._log.info("Waiting for device to reconnect (timeout: %ds)...", RECONNECT_TIMEOUT_SECS)
+
+        while time.monotonic() - start < RECONNECT_TIMEOUT_SECS:
+            try:
+                self._serial = self._serial_cls(self.serial_port, self.baud_rate, timeout=0.1)
+            except SerialException:
+                time.sleep(RECONNECT_RETRY_INTERVAL)
+            else:
+                self._log.info("Reconnected to %s", self.serial_port)
+                return True
+
+        self._log.error("Reconnect timeout after %ds", RECONNECT_TIMEOUT_SECS)
+        return False
 
     def _handle_uart_message(self, msg: Dict[str, Any]) -> None:
         mapped = self._map_uart_message(msg)

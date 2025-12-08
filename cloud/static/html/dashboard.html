@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Whac-A-Mole</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/x-icon" href="/static/ico/favicon.ico" />
+  </head>
+  <body class="bg-gray-900 text-gray-100 p-6 font-mono">
+    <div class="max-w-4xl mx-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h1 class="text-xl font-bold">Whac-A-Mole</h1>
+        <button
+          id="pauseBtn"
+          onclick="togglePause()"
+          class="bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold py-2 px-6 rounded"
+        >
+          Pause
+        </button>
+      </div>
+      <div class="bg-gray-800 rounded p-4 h-96 overflow-y-auto" id="log">
+        <div class="text-gray-500">Loading...</div>
+      </div>
+    </div>
+    <script>
+      let paused = false;
+      let refrate = 500;
+
+      async function togglePause() {
+        await fetch("/command/whacamole-dev", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "command=P",
+        });
+        paused = !paused;
+        const btn = document.getElementById("pauseBtn");
+        btn.textContent = paused ? "Resume" : "Pause";
+        btn.className = paused
+          ? "bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded"
+          : "bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold py-2 px-6 rounded";
+      }
+
+      async function refresh() {
+        const res = await fetch("/events");
+        const events = await res.json();
+        const log = document.getElementById("log");
+        if (events.length === 0) {
+          log.innerHTML = '<div class="text-gray-500">No events yet</div>';
+        } else {
+          log.innerHTML = events
+            .map((e) => `<div class="py-1 text-xs">${e}</div>`)
+            .join("");
+        }
+      }
+
+      refresh();
+      setInterval(refresh, refrate);
+    </script>
+  </body>
+</html>

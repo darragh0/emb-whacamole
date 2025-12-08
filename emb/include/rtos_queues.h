@@ -19,9 +19,6 @@
 /** @brief Maximum events in the event queue */
 #define EVENT_QUEUE_LENGTH 32
 
-/** @brief Maximum commands in the command queue */
-#define CMD_QUEUE_LENGTH 4
-
 #define RTOS_QUEUES_OK 0
 #define RTOS_QUEUES_ERR -1
 
@@ -54,19 +51,8 @@ typedef struct {
     } data;
 } game_event_t;
 
-/** @brief Command types from agent to game */
-typedef enum {
-    CMD_PAUSE,
-} command_type_t;
-
-/** @brief Command structure (received from agent) */
-typedef struct {
-    command_type_t type;
-} agent_command_t;
-
 // Queue handles (extern - defined in rtos_queues.c)
 extern QueueHandle_t event_queue;
-extern QueueHandle_t cmd_queue;
 
 /**
  * @brief Initialize queues

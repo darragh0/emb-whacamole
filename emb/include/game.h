@@ -15,9 +15,6 @@ typedef enum {
     POP_LATE = 2,
 } pop_outcome_t;
 
-// Pause state (set by agent task via cmd_queue)
-extern volatile bool game_paused;
-
 /** @brief Wait for start button press */
 int await_start(void);
 

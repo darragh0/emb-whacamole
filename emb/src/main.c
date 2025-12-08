@@ -1,6 +1,7 @@
 #include "agent.h"
 #include "game.h"
 #include "io_expander.h"
+#include "pause.h"
 #include "rtos_queues.h"
 #include "task.h"
 #include "utils.h"
@@ -16,6 +17,7 @@
 /** @brief Initialize hardware & RTOS tasks */
 static long init_all(void) {
     long err;
+    TaskHandle_t game_handle;
 
     // Init IO expander before creating tasks
     if ((err = io_expander_init()) != E_SUCCESS) {
@@ -30,8 +32,8 @@ static long init_all(void) {
     }
 
     // Create game task (real-time game logic)
-    if ((err = xTaskCreate(game_task, "Game", TASK_STACK_SIZE, NULL, GAME_TASK_PRIORITY, NULL))
-        != pdPASS) {
+    if ((err = xTaskCreate(game_task, "Game", TASK_STACK_SIZE, NULL, GAME_TASK_PRIORITY,
+                           &game_handle)) != pdPASS) {
         eputs("failed to create Game task", err);
         return -1;
     }
@@ -42,6 +44,9 @@ static long init_all(void) {
         eputs("failed to create Agent task", err);
         return -1;
     }
+
+    // Init pause system (UART interrupt + pause task)
+    pause_init(game_handle);
 
     return INIT_SUCCESS;
 }

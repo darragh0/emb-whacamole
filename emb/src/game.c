@@ -6,8 +6,6 @@
 #include "utils.h"
 #include <stdint.h>
 
-volatile bool game_paused = false;
-
 static uint8_t lives;
 static uint32_t rng_state;
 
@@ -73,34 +71,6 @@ static void emit_session_end(bool won) {
         .data.session_end.won = won,
     };
     xQueueSend(event_queue, &event, 0);
-}
-
-/** @brief Advance the pause animation (alternating LEDs) */
-static void pause_animation_step(void) {
-    static uint8_t pattern = 0xAA; // 10101010
-    io_expander_write_leds(pattern);
-    pattern = ~pattern; // Toggle to 01010101
-}
-
-/** @brief Poll command queue for pause command & handle pause state loop */
-static void check_pause(void) {
-    agent_command_t cmd;
-    while (xQueueReceive(cmd_queue, &cmd, 0) == pdTRUE) {
-        if (cmd.type == CMD_PAUSE) {
-            game_paused = !game_paused;
-        }
-    }
-
-    while (game_paused) {
-        pause_animation_step();
-        MS_SLEEP(200);
-
-        // Check for unpause
-        if (xQueueReceive(cmd_queue, &cmd, 0) == pdTRUE && cmd.type == CMD_PAUSE) {
-            game_paused = false;
-            led_hw_write(); // Clear LEDs
-        }
-    }
 }
 
 /** @brief Flash LEDs for late/miss feedback */
@@ -175,8 +145,6 @@ static pop_outcome_t pop_do(
     const uint8_t poll_interval = 5;
 
     while (elapsed < duration_ms) {
-        check_pause(); // Handle pause during pop
-
         io_expander_read_btns(&btn_state);
 
         if (btn_state != BTN_HW_STATE) {
@@ -199,9 +167,7 @@ static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
     lvl_show(lvl_idx);
 
     for (int pop = 0; pop < pops; pop++) {
-        check_pause();
         pop_wait_delay(&rng_state);
-        check_pause();
 
         uint8_t mole;
         uint16_t reaction_ms;
@@ -266,7 +232,6 @@ void game_run(void) {
     emit_session_start();
 
     for (uint8_t lvl = 0; lvl < LVLS; lvl++) {
-        uint16_t duration_ms = POP_DURATIONS[lvl];
         // printf("\nLevel %d  |  %d ms  |  Lives: %d\n", lvl + 1, duration_ms, lives);
         game_run_level(lvl, POPS_PER_LVL[lvl]);
         if (lives == 0) {

@@ -1,52 +1,44 @@
-# Bridge (UART ↔ MQTT)
+# Agent (UART ↔ MQTT Bridge)
 
-Serial-to-MQTT bridge for the Whac-A-Mole board. It reads JSON lines from the device over UART and publishes to MQTT topics used by the cloud backend, and forwards MQTT commands/config back to the device over UART.
+Serial-to-MQTT bridge for the Whac-A-Mole board. Reads JSON lines from the device over UART and publishes them to MQTT topics used by the cloud backend, and forwards MQTT commands/config back to the device over UART.
 
 ## Installation
 
 ### Requirements
-
-- Python >= 3.10
+- Python >= 3.12
 
 ### Using uv
-
 ```bash
 uv sync && . ./.venv/bin/activate
 ```
 
 ### Using pip
-
 ```bash
 python3 -m venv venv
 . venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install .        # or `pip install -e .` for development
-
-# Now you should be able to run `agent` directly
 ```
 
 ## Files
-
 ```
 .
 ├── config
-│   └── logging.json                      # Config for console logging (stdout/stderr)
+│   └── logging.json                      # Config for console logging (stdout/stderr)
 ├── pyproject.toml
 ├── README.md
 ├── ruff.toml
 └── src
-    └── agent
-         ├── argparser.py                  # CLI flags (serial, MQTT, device ID)
-         ├── bridge.py                     # UART ↔ MQTT logic
-         ├── test_bridge.py                # Mapping/command unit tests
-         ├── __init__.py
-         ├── logging_conf.py               # Logging config (for logging.json, can ignore this)
-         └── __main__.py                   # Entry point (`python -m agent`)
+    └── agent
+        ├── argparser.py                  # CLI flags (serial, MQTT, device ID)
+        ├── bridge.py                     # UART ↔ MQTT logic
+        ├── test_bridge.py                # Mapping/command unit tests
+        ├── __init__.py
+        ├── logging_conf.py               # Logging config (for logging.json, can ignore this)
+        └── __main__.py                   # Entry point (`python -m agent`)
 ```
 
 ## Usage
-
 ```bash
-# Start the bridge (examples)
 python -m agent.bridge --serial-port /dev/ttyACM0 --device-id dev1 --mqtt-host localhost --mqtt-port 1883
 # or with defaults from env MQTT_BROKER / MQTT_PORT
 agent -s /dev/ttyACM0 --device-id dev1
@@ -62,88 +54,42 @@ Supported flags:
 ## Testing
 
 ### Unit Tests
-
 Run the bridge unit tests to verify message mapping and command handling:
-
 ```bash
 cd agent
 ./venv/bin/python -m pytest src/agent/test_bridge.py -v
 ```
 
-### Integration Testing (Without Physical Board)
-
-Use the fake UART device simulator to test the full bridge flow:
-
-**Terminal 1** - Start MQTT broker:
+### Integration (no board, UART simulated)
+Use socat to create paired PTYs:
 ```bash
-mosquitto -v
-# or with Docker: docker run -p 1883:1883 eclipse-mosquitto
+socat -d -d PTY,raw,echo=0 PTY,raw,echo=0
+# note the two PTYs (e.g., /dev/pts/6 and /dev/pts/7)
 ```
-
-**Terminal 2** - Start cloud worker:
+- Broker: `mosquitto -v`
+- Cloud: `cd cloud && . venv/bin/activate && python mqtt_worker.py`
+- Bridge: `cd agent && . venv/bin/activate && python -m agent.bridge -s /dev/pts/6 --device-id devsim`
+- Inject firmware JSON on the other PTY:
 ```bash
-cd cloud
-./venv/bin/python mqtt_worker.py
+printf '{"type":"game_event","pop":3,"level":1,"outcome":"HIT","reaction_ms":120,"lives_left":4,"ts":1717}\n' > /dev/pts/7
+printf '{"type":"status","state":"playing","level":1,"pop_index":7,"lives_left":4,"ts":1718}\n' > /dev/pts/7
 ```
+- Watch MQTT: `mosquitto_sub -t "whac/devsim/#" -v`
+- Send command round-trip: `mosquitto_pub -t "whac/devsim/commands" -m '{"command":"pause"}' -q 1`
 
-**Terminal 3** - Start fake UART device:
-```bash
-cd agent
-python3 fake_uart_device.py
-# Note the virtual serial port printed (e.g., /dev/pts/5)
-```
-
-**Terminal 4** - Start bridge with the virtual port:
-```bash
-cd agent
-./venv/bin/python -m agent.bridge -s /dev/pts/5 --device-id test-dev
-```
-
-You should see:
-- Fake device sending game events, status, and telemetry
-- Bridge forwarding messages to MQTT topics
-- Cloud worker receiving and storing events
-
-**Terminal 5** - Send test commands:
-```bash
-# Pause the game
-mosquitto_pub -t "whac/test-dev/commands" -m '{"command":"pause"}' -q 1
-
-# Resume
-mosquitto_pub -t "whac/test-dev/commands" -m '{"command":"resume"}' -q 1
-
-# Set level
-mosquitto_pub -t "whac/test-dev/commands" -m '{"command":"set_level","value":3}' -q 1
-```
-
-### Alternative: Test with Cloud Fake Device
-
-Skip the UART simulation and test MQTT directly:
-
-```bash
-# Terminal 1: mosquitto -v
-# Terminal 2: cd cloud && ./venv/bin/python mqtt_worker.py
-# Terminal 3: cd cloud && python3 fake_device.py
-```
-
-## End-to-end pipeline (With Physical Board)
-
-1. Start MQTT broker (e.g., `mosquitto` or `docker run -p 1883:1883 eclipse-mosquitto`).
+## End-to-end (with board)
+1. Start MQTT broker (`mosquitto -v` or `docker run -p 1883:1883 eclipse-mosquitto`).
 2. Start cloud worker: `python cloud/mqtt_worker.py` (from repo root).
 3. (Optional) Start leaderboard UI: `uvicorn cloud.app:app --host 0.0.0.0 --port 8000 --reload`.
-4. Flash/run the firmware in `emb/` on the board.
-5. Run the bridge (see command above). It will:
-   - UART → MQTT: publish device JSON to `whac/<device_id>/game_events`, `/status`, `/telemetry/<sensor>`, `/events`, `/config_request` (depending on `type`/`event_type` fields).
+4. Flash/run firmware.
+5. Run the bridge (command above). It will:
+   - UART → MQTT: publish device JSON to `whac/<device_id>/game_events`, `/status`, `/telemetry/<sensor>`, `/events`, `/config_request` (based on `type`/`event_type`).
    - MQTT → UART: subscribe to `whac/<device_id>/commands` and forward JSON commands to the board (one line per command).
 
-Example MQTT commands that propagate back to the board (newline-terminated JSON on UART):
+Example MQTT commands that propagate back to the board:
 ```bash
-# Pause
 mosquitto_pub -t "whac/dev1/commands" -m '{"command":"pause"}' -q 1
-# Resume
 mosquitto_pub -t "whac/dev1/commands" -m '{"command":"resume"}' -q 1
-# Adjust pop duration mid-game
 mosquitto_pub -t "whac/dev1/commands" -m '{"command":"set_pop_duration","value":900}' -q 1
-# Using config payload (matches cloud/config.py):
 mosquitto_pub -t "whac/dev1/commands" -m '{"config":{"pause":true,"set_pop_duration":900,"set_lives":6}}' -q 1 -r
 ```
