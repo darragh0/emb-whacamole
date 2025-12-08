@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Final
 from paho.mqtt import publish
 from paho.mqtt.client import Client
 
-from .utils import get_env_vars
+from .env import get_env_vars
 
 if TYPE_CHECKING:
     from collections.abc import Callable
