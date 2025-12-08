@@ -103,12 +103,17 @@ class BridgeTests(unittest.TestCase):
         )
         # Include direct command as well.
         bridge._handle_command_payload(json.dumps({"command": "resume"}))
+        # Legacy single-byte pause
+        bridge._handle_command_payload("P")
 
         lines = [line.decode("utf-8").strip() for line in ser.written]
-        self.assertIn(json.dumps({"command": "pause"}), lines)
-        self.assertIn(json.dumps({"command": "set_pop_duration", "value": 900}), lines)
-        self.assertIn(json.dumps({"command": "set_lives", "value": 6}), lines)
-        self.assertIn(json.dumps({"command": "resume"}), lines)
+        # Raw 'P' writes remain raw bytes, not JSON lines
+        raw_entries = [b for b in ser.written if b == b"P"]
+        json_entries = [line for line in lines if line != ""]
+
+        self.assertGreaterEqual(len(raw_entries), 2)  # pause + resume mapped to P
+        self.assertIn(json.dumps({"command": "set_pop_duration", "value": 900}), json_entries)
+        self.assertIn(json.dumps({"command": "set_lives", "value": 6}), json_entries)
 
     def test_invalid_uart_json_is_ignored(self):
         mqtt = FakeMQTTClient()

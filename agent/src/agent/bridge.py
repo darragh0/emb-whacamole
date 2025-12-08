@@ -259,24 +259,28 @@ class Bridge:
         return payload
 
     def _handle_command_payload(self, payload: str) -> None:
-        # Support legacy single-byte commands (e.g., "P" from older cloud)
-        trimmed = payload.strip()
-        if trimmed.upper() == "P":
-            commands = [{"command": "pause"}]
-        else:
-            try:
-                data = json.loads(payload)
-            except json.JSONDecodeError as exc:
-                self._log.warning("Ignoring invalid MQTT command JSON: %s (err: %s)", payload, exc)
-                return
-            commands = self._build_commands_from_payload(data)
+        # Legacy single-byte pause command ("P" toggles pause in firmware)
+        if payload.strip().upper() == "P":
+            self._write_raw(b"P")
+            return
 
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError as exc:
+            self._log.warning("Ignoring invalid MQTT command JSON: %s (err: %s)", payload, exc)
+            return
+
+        commands = self._build_commands_from_payload(data)
         if not commands:
             self._log.warning("No commands generated from payload: %s", data)
             return
 
         for cmd in commands:
-            self._write_command(cmd)
+            # Pause/resume also map to raw "P" for firmware compatibility.
+            if cmd.get("command") in {"pause", "resume"} and "value" not in cmd:
+                self._write_raw(b"P")
+            else:
+                self._write_command(cmd)
 
     def _build_commands_from_payload(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         cmds: List[Dict[str, Any]] = []
@@ -318,6 +322,17 @@ class Bridge:
                 self._serial.write((line + "\n").encode("utf-8"))
         except SerialException as exc:
             self._log.error("Failed to write command to serial: %s", exc)
+
+    def _write_raw(self, data: bytes) -> None:
+        if not self._serial:
+            self._log.warning("Serial not available; dropping raw command")
+            return
+        self._log.info("UART <= (raw) %s", data)
+        try:
+            with self._serial_lock:
+                self._serial.write(data)
+        except SerialException as exc:
+            self._log.error("Failed to write raw command to serial: %s", exc)
 
     @staticmethod
     def _to_int(value: Any, default: int) -> int:

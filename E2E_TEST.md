@@ -17,6 +17,7 @@ How to validate the path from device UART → MQTT → cloud (and commands back)
   cd ../agent
   python -m venv venv && . venv/bin/activate
   pip install -e .
+  cp .env.example .env  # defaults to alderaan.software-engineering.ie; change to localhost if using local broker
   deactivate
   ```
 - For simulation (no hardware): `socat` to create paired PTYs (`sudo apt install socat`).

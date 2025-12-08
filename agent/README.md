@@ -39,6 +39,7 @@ pip install .        # or `pip install -e .` for development
 
 ## Usage
 ```bash
+cp .env.example .env  # defaults to alderaan.software-engineering.ie; change if using a local broker
 python -m agent.bridge --serial-port /dev/ttyACM0 --device-id dev1 --mqtt-host localhost --mqtt-port 1883
 # or with defaults from env MQTT_BROKER / MQTT_PORT
 agent -s /dev/ttyACM0 --device-id dev1
@@ -67,7 +68,7 @@ socat -d -d PTY,raw,echo=0 PTY,raw,echo=0
 # note the two PTYs (e.g., /dev/pts/6 and /dev/pts/7)
 ```
 - Broker: `mosquitto -v`
-- Cloud: `cd cloud && . venv/bin/activate && python mqtt_worker.py`
+- Cloud: `cd cloud && . venv/bin/activate && python -m cloud`
 - Bridge: `cd agent && . venv/bin/activate && python -m agent.bridge -s /dev/pts/6 --device-id devsim`
 - Inject firmware JSON on the other PTY:
 ```bash
@@ -79,8 +80,8 @@ printf '{"type":"status","state":"playing","level":1,"pop_index":7,"lives_left":
 
 ## End-to-end (with board)
 1. Start MQTT broker (`mosquitto -v` or `docker run -p 1883:1883 eclipse-mosquitto`).
-2. Start cloud worker: `python cloud/mqtt_worker.py` (from repo root).
-3. (Optional) Start leaderboard UI: `uvicorn cloud.app:app --host 0.0.0.0 --port 8000 --reload`.
+2. Start cloud worker: `cd cloud && . venv/bin/activate && python -m cloud`.
+3. (Optional) Start leaderboard UI: `cd cloud && . venv/bin/activate && uvicorn cloud.app:app --host 0.0.0.0 --port 8000 --reload`.
 4. Flash/run firmware.
 5. Run the bridge (command above). It will:
    - UART → MQTT: publish device JSON to `whac/<device_id>/game_events`, `/status`, `/telemetry/<sensor>`, `/events`, `/config_request` (based on `type`/`event_type`).
@@ -88,6 +89,7 @@ printf '{"type":"status","state":"playing","level":1,"pop_index":7,"lives_left":
 
 Example MQTT commands that propagate back to the board:
 ```bash
+mosquitto_pub -t "whac/dev1/commands" -m 'P' -q 1
 mosquitto_pub -t "whac/dev1/commands" -m '{"command":"pause"}' -q 1
 mosquitto_pub -t "whac/dev1/commands" -m '{"command":"resume"}' -q 1
 mosquitto_pub -t "whac/dev1/commands" -m '{"command":"set_pop_duration","value":900}' -q 1
