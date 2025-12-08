@@ -22,4 +22,4 @@ int await_start(void);
 void game_run(void);
 
 /** @brief FreeRTOS task entry point (wraps welcome/await_start/game_run in a loop) **/
-void game_task(void* param);
+void game_task(void* const param);

@@ -33,21 +33,21 @@ static int mk_i2c_master_tx(const unsigned int addr, uint8_t* const buf, const b
 }
 
 int io_expander_init(void) {
-    int errno = MXC_I2C_Init(I2C_MASTER, true, 0);
-    if (errno != E_SUCCESS) return errno;
+    int err = MXC_I2C_Init(I2C_MASTER, true, 0);
+    if (err != E_SUCCESS) return err;
 
-    int errno2 = MXC_I2C_SetFrequency(I2C_MASTER, I2C_FREQ);
-    if (errno2 < 0) {
+    err = MXC_I2C_SetFrequency(I2C_MASTER, I2C_FREQ);
+    if (err < 0) {
         MXC_I2C_Shutdown(I2C_MASTER);
-        return errno2;
+        return err;
     }
 
     // Wake up buttons/leds
     uint8_t initial_btn_state = BTN_HW_STATE;
-    int errno3 = mk_i2c_master_tx(ADDR_IN, &initial_btn_state, true);
-    if (errno3 != E_SUCCESS) {
+    err = mk_i2c_master_tx(ADDR_IN, &initial_btn_state, true);
+    if (err != E_SUCCESS) {
         MXC_I2C_Shutdown(I2C_MASTER);
-        return errno3;
+        return err;
     }
 
     uint8_t initial_led_state = LED_HW_STATE;
@@ -56,6 +56,10 @@ int io_expander_init(void) {
 
 int io_expander_deinit(void) { return MXC_I2C_Shutdown(I2C_MASTER); }
 
-int io_expander_read_btns(uint8_t* const button_state) { return mk_i2c_master_tx(ADDR_IN, button_state, false); }
+int io_expander_read_btns(uint8_t* const button_state) {
+    return mk_i2c_master_tx(ADDR_IN, button_state, false);
+}
 
-int io_expander_write_leds(uint8_t led_pattern) { return mk_i2c_master_tx(ADDR_OUT, &led_pattern, true); }
+int io_expander_write_leds(uint8_t led_pattern) {
+    return mk_i2c_master_tx(ADDR_OUT, &led_pattern, true);
+}

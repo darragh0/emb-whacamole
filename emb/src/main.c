@@ -32,8 +32,10 @@ static long init_all(void) {
     }
 
     // Create game task (real-time game logic)
-    if ((err = xTaskCreate(game_task, "Game", TASK_STACK_SIZE, NULL, GAME_TASK_PRIORITY,
-                           &game_handle)) != pdPASS) {
+    if ((err = xTaskCreate(
+             game_task, "Game", TASK_STACK_SIZE, NULL, GAME_TASK_PRIORITY, &game_handle
+         ))
+        != pdPASS) {
         eputs("failed to create Game task", err);
         return -1;
     }
@@ -46,7 +48,10 @@ static long init_all(void) {
     }
 
     // Init pause system (UART interrupt + pause task)
-    pause_init(game_handle);
+    if ((err = pause_init(game_handle)) != E_SUCCESS) {
+        eputs("failed to init Pause ", err);
+        return err;
+    }
 
     return INIT_SUCCESS;
 }

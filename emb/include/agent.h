@@ -9,4 +9,4 @@
 #pragma once
 
 /** @brief FreeRTOS task entry point */
-void agent_task(void* param);
+void agent_task(void* const param);

@@ -45,8 +45,7 @@ static void send_event_json(const game_event_t* event) {
     fflush(stdout);
 }
 
-
-void agent_task(void* param) {
+void agent_task(void* const param) {
     (void)param;
     game_event_t event;
 

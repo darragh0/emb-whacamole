@@ -249,7 +249,7 @@ void game_run(void) {
     feedback_win();
 }
 
-void game_task(void* param) {
+void game_task(void* const param) {
     (void)param;
 
     while (true) {

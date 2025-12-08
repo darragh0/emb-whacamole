@@ -1,6 +1,7 @@
 #include "pause.h"
 #include "board.h"
 #include "nvic_table.h"
+#include "portmacro.h"
 #include "uart.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -24,7 +25,7 @@ void UART_Handler(void) {
     }
 }
 
-static void pause_task(void* param) {
+static void pause_task(void* const param) {
     (void)param;
 
     while (true) {
@@ -39,10 +40,10 @@ static void pause_task(void* param) {
     }
 }
 
-void pause_init(TaskHandle_t game_handle) {
+BaseType_t pause_init(const TaskHandle_t game_handle) {
     game_task_handle = game_handle;
 
-    xTaskCreate(
+    BaseType_t err = xTaskCreate(
         pause_task,
         "Pause",
         configMINIMAL_STACK_SIZE,
@@ -51,9 +52,14 @@ void pause_init(TaskHandle_t game_handle) {
         &pause_task_handle
     );
 
+    if (err != pdPASS) return err;
+
     mxc_uart_regs_t* uart = MXC_UART_GET_UART(CONSOLE_UART);
-    MXC_UART_SetRXThreshold(uart, 1);
-    MXC_UART_EnableInt(uart, MXC_F_UART_INT_EN_RX_THD);
+    if ((err = MXC_UART_SetRXThreshold(uart, 1)) != E_SUCCESS) return err;
+    if ((err = MXC_UART_EnableInt(uart, MXC_F_UART_INT_EN_RX_THD)) != E_SUCCESS) return err;
+
     MXC_NVIC_SetVector(MXC_UART_GET_IRQ(CONSOLE_UART), UART_Handler);
     NVIC_EnableIRQ(MXC_UART_GET_IRQ(CONSOLE_UART));
+
+    return E_SUCCESS;
 }
