@@ -4,19 +4,21 @@ How to validate the path from device UART → MQTT → cloud (and commands back)
 
 ## Prereqs
 - MQTT broker (`mosquitto` installed; run `mosquitto -v`).
-- Virtual envs for `cloud/` and `agent/`.
-  - From repo root:
-    ```bash
-    cd cloud
-    python -m venv venv && . venv/bin/activate
-    pip install -r requirements.txt
-    deactivate
+- Virtual envs for `cloud/` and `agent/` (Python >= 3.12).
+  ```bash
+  # cloud (from repo root)
+  cd cloud
+  python -m venv venv && . venv/bin/activate
+  pip install -e .
+  cp .env.example .env  # edit MQTT_BROKER/MQTT_PORT if needed
+  deactivate
 
-    cd ../agent
-    python -m venv venv && . venv/bin/activate
-    pip install -e .
-    deactivate
-    ```
+  # agent
+  cd ../agent
+  python -m venv venv && . venv/bin/activate
+  pip install -e .
+  deactivate
+  ```
 - For simulation (no hardware): `socat` to create paired PTYs (`sudo apt install socat`).
 
 ## With a real board
@@ -29,8 +31,8 @@ mosquitto -v
 2) Cloud worker (new terminal):
 ```bash
 cd cloud
-source venv/bin/activate
-python mqtt_worker.py
+. venv/bin/activate
+python -m cloud
 ```
 3) Optional leaderboard UI (same venv or another terminal):
 ```bash
@@ -52,6 +54,7 @@ mosquitto_sub -t "whac/dev1/#" -v
 ```bash
 mosquitto_pub -t "whac/dev1/commands" -m '{"command":"pause"}' -q 1
 mosquitto_pub -t "whac/dev1/commands" -m '{"command":"set_pop_duration","value":900}' -q 1
+# Legacy cloud pause command also works:  mosquitto_pub -t "whac/dev1/commands" -m 'P' -q 1
 ```
 
 ## Without hardware (UART simulated)

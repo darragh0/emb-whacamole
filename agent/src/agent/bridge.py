@@ -259,13 +259,18 @@ class Bridge:
         return payload
 
     def _handle_command_payload(self, payload: str) -> None:
-        try:
-            data = json.loads(payload)
-        except json.JSONDecodeError as exc:
-            self._log.warning("Ignoring invalid MQTT command JSON: %s (err: %s)", payload, exc)
-            return
+        # Support legacy single-byte commands (e.g., "P" from older cloud)
+        trimmed = payload.strip()
+        if trimmed.upper() == "P":
+            commands = [{"command": "pause"}]
+        else:
+            try:
+                data = json.loads(payload)
+            except json.JSONDecodeError as exc:
+                self._log.warning("Ignoring invalid MQTT command JSON: %s (err: %s)", payload, exc)
+                return
+            commands = self._build_commands_from_payload(data)
 
-        commands = self._build_commands_from_payload(data)
         if not commands:
             self._log.warning("No commands generated from payload: %s", data)
             return
