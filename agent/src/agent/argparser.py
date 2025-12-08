@@ -1,3 +1,4 @@
+import os
 from argparse import ArgumentParser
 from typing import TypedDict, cast
 
@@ -25,8 +26,28 @@ def _mk_parser() -> ArgumentParser:
     arg = parser.add_argument
 
     arg("-s", "--serial-port", required=True, help="serial port (e.g. /dev/ttyUSB0)", metavar="P")
-    arg("--baud", type=int, default=115200, help="serial baud rate (default: 115200)", dest="baud_rate", metavar="R")
+    arg(
+        "--baud",
+        type=int,
+        default=115200,
+        help="serial baud rate (default: 115200)",
+        dest="baud_rate",
+        metavar="R",
+    )
     arg("--device-id", default="whacamole-dev", help="device ID (default: whacamole-dev)", metavar="ID")
+    arg(
+        "--mqtt-host",
+        default=os.getenv("MQTT_BROKER", "localhost"),
+        help="MQTT broker host (default: env MQTT_BROKER or localhost)",
+        metavar="HOST",
+    )
+    arg(
+        "--mqtt-port",
+        type=int,
+        default=int(os.getenv("MQTT_PORT", "1883")),
+        help="MQTT broker port (default: env MQTT_PORT or 1883)",
+        metavar="PORT",
+    )
     return parser
 
 
@@ -34,6 +55,8 @@ class Args(TypedDict):
     serial_port: str
     baud_rate: int
     device_id: str
+    mqtt_host: str
+    mqtt_port: int
 
 
 def get_args() -> Args:
