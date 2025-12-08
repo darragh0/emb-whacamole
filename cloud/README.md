@@ -1,62 +1,62 @@
-Cloud backend for the Whack-a-Mole project. Device communication is MQTT-only (events + commands). An optional FastAPI app serves a leaderboard UI for humans.
+# Cloud
 
-## Stack
-- Python 3.11+, paho-mqtt client for device ingest/commands.
-- Optional FastAPI + Uvicorn only for the leaderboard UI/stats (no device ingestion over HTTP).
-- JSON file persistence to keep dependencies low; can be swapped for SQLite/Postgres if needed.
+MQTT backend + dashboard for the Whac-A-Mole game.
 
-## Layout
-- `mqtt_worker.py` - MQTT client: subscribes to device topics, stores sessions, responds with config/commands.
-- `app.py` - Optional FastAPI app that serves a leaderboard UI and stats (no device ingest).
-- `models.py` - Pydantic models for request/response validation.
-- `storage.py` - JSON-backed data store plus leaderboard/stats helpers.
-- `config.py` - Holds default/per-device configuration and persists it.
-- `device_protocol.md` - Message formats and topic/path conventions.
-- `data/` - Runtime data (sessions + config). Git-ignored except for `.gitkeep`.
+## Installation
 
-## Running the MQTT worker (device path)
+### Requirements
+
+- Python >= 3.12
+
+### Using uv
+
 ```bash
-cd cloud
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python mqtt_worker.py
-```
-- Environment variables:
-  - `MQTT_BROKER` (default: `localhost`)
-  - `MQTT_PORT` (default: `1883`)
-
-## Starting a local MQTT broker (mosquitto)
-- Docker: `docker run -p 1883:1883 eclipse-mosquitto`
-- Native (Debian/Ubuntu): `sudo apt install mosquitto` then `mosquitto -v`
-- Course server: use the provided broker host/port (set `MQTT_BROKER`/`MQTT_PORT` accordingly).
-
-## Running the leaderboard UI (optional, human-facing)
-```bash
-cd cloud
-source .venv/bin/activate
-uvicorn app:app --host 0.0.0.0 --port 8000 --reload
-```
-- Leaderboard UI: `http://localhost:8000/leaderboard`
-- Stats API (for dashboards): `http://localhost:8000/api/leaderboard`, `http://localhost:8000/api/stats`, `http://localhost:8000/api/health`
-
-## Key endpoints
-- Device path is MQTT-only. See `device_protocol.md` for topics/payloads.
-- HTTP endpoints are only for humans/dashboards:
-  - `GET /api/leaderboard` - Aggregated scores by player.
-  - `GET /api/stats` - Summary counts for dashboards.
-  - `GET /leaderboard` - Minimal HTML leaderboard for humans.
-
-## Fake device for demos
-Publish sample sessions to MQTT to exercise the backend and leaderboard:
-```bash
-cd cloud
-source .venv/bin/activate
-python fake_device.py
-# set MQTT_BROKER/MQTT_PORT/DEVICE_ID if needed
+uv sync && . ./.venv/bin/activate
 ```
 
-## Adapting firmware
-- Send ISO-8601 timestamps (`Z` for UTC).
-- Always include `device_id`; `session_id` can be a UUID or incrementing counter.
-- Extra fields are ignored by the backend so firmware can evolve without breaking ingestion.
+### Using pip
+
+```bash
+python3 -m venv venv
+. venv/bin/activate  # or `venv\Scripts\activate` on Windows
+pip install .        # or `pip install -e .` for development
+
+# Now you should be able to run `cloud` directly
+```
+
+## Configuration
+
+Copy `.env.example` to `.env` and set the MQTT broker details:
+
+```bash
+cp .env.example .env
+```
+
+Required environment variables:
+
+- `MQTT_BROKER` - MQTT broker URL
+- `MQTT_PORT` - MQTT broker port (default: 1883)
+
+## Files
+
+```
+.
+├── data
+│   └── events.jsonl              # Game events log (JSONL)
+├── src
+│   └── cloud
+│       ├── app.py                # FastAPI app, routes, static files
+│       ├── __init__.py
+│       ├── __main__.py           # Entry point (MQTT subscriber + uvicorn)
+│       ├── mqtt.py               # MQTT subscribe/publish
+│       ├── types.py              # TypedDict definitions for events
+│       └── utils.py              # Config, paths, error handling
+├── static
+│   ├── html
+│   │   └── dashboard.html        # Dashboard UI
+│   └── ico
+│       └── favicon.ico
+├── .env.example
+├── pyproject.toml
+└── ruff.toml
+```

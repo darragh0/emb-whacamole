@@ -24,9 +24,16 @@ def _mk_parser() -> ArgumentParser:
 
     arg = parser.add_argument
 
-    arg("-s", "--serial-port", required=True, help="serial port (e.g. /dev/ttyUSB0)", metavar="P")
-    arg("--baud", type=int, default=115200, help="serial baud rate (default: 115200)", dest="baud_rate", metavar="R")
-    arg("--device-id", default="whacamole-dev", help="device ID (default: whacamole-dev)", metavar="ID")
+    arg("-s", "--serial-port", required=True, help="serial port (e.g. [cyan]/dev/ttyUSB0[/])", metavar="P")
+    arg(
+        "--baud",
+        type=int,
+        default=115200,
+        help="baud rate (default: [yellow]115200[/])",
+        dest="baud_rate",
+        metavar="RATE",
+    )
+    arg("--device-id", default="whacamole-dev", help='device ID (default: [green]"whacamole-dev"[/])', metavar="ID")
     return parser
 
 

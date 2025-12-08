@@ -1,101 +1,113 @@
-"""Simple UART bridge for embedded device communication.
-
-Reads JSON events from device over UART and logs them.
-"""
+"""UART-to-MQTT bridge for embedded device communication."""
 
 from __future__ import annotations
 
 import json
 import logging
+from typing import TYPE_CHECKING, Any
 
+from paho.mqtt.client import Client, MQTTMessage
 from serial import Serial, SerialException
+
+if TYPE_CHECKING:
+    from logging import Logger
 
 
 class Bridge:
-    """Bridges UART device to cloud backend."""
+    """Bridges UART device to MQTT broker."""
 
+    mqtt_broker: str
+    mqtt_port: int
     serial_port: str
     baud_rate: int
     device_id: str
 
+    _log: Logger
+    _serial: Serial | None
+    _mqtt: Client
+
     def __init__(
         self,
         *,
+        mqtt_broker: str,
+        mqtt_port: int,
         serial_port: str,
-        baud_rate: int = 115200,
-        device_id: str = "whacamole-dev",
+        baud_rate: int,
+        device_id: str,
     ) -> None:
+        self.mqtt_broker = mqtt_broker
+        self.mqtt_port = mqtt_port
         self.serial_port = serial_port
         self.baud_rate = baud_rate
         self.device_id = device_id
+
         self._log = logging.getLogger("Bridge")
+        self._serial = None
+        self._mqtt = Client(client_id=f"agent-{device_id}")
+        self._mqtt.on_message = self._on_message
 
     def run(self) -> None:
-        """Connect to UART & process events."""
+        """Connect to MQTT and UART, then process events."""
+
+        self._log.info("Connecting to MQTT broker %s", self.mqtt_broker)
+        self._mqtt.connect(self.mqtt_broker, self.mqtt_port)
+        self._mqtt.subscribe(f"whac/{self.device_id}/commands")
+        self._mqtt.loop_start()
 
         self._log.info("Connecting to %s (%d baud)", self.serial_port, self.baud_rate)
-
         try:
-            serial = Serial(self.serial_port, self.baud_rate, timeout=0.1)
+            self._serial = Serial(self.serial_port, self.baud_rate, timeout=0.1)
         except SerialException as e:
             self._log.error("Failed to connect to serial port: %s", e)
+            self._mqtt.loop_stop()
             return
-        else:
-            self._log.info("Connected to %s", self.serial_port)
+
+        self._log.info("Connected to %s", self.serial_port)
 
         try:
-            self._read_events(serial)
+            self._read_events()
         finally:
-            serial.close()
+            self._mqtt.loop_stop()
+            if self._serial is not None:
+                self._serial.close()
             self._log.info("Shutdown complete")
 
-    def _read_events(self, serial: Serial) -> None:
+    def _read_events(self) -> None:
         """Read and process events from serial port."""
-        while True:
+
+        while self._serial:
             try:
-                line_bytes = serial.readline()
+                line_bytes = self._serial.readline()
             except SerialException as e:
                 self._log.error("Serial read error: %s", e)
-                break
-            except Exception:  # noqa: BLE001
-                self._log.exception("Unexpected error reading serial")
                 break
 
             if not line_bytes:
                 continue
 
             line = line_bytes.decode("utf-8", errors="replace").strip()
-
-            # Only log json lines (events)
             if line.startswith("{"):
                 self._process_event(line)
 
     def _process_event(self, jsonl: str) -> None:
-        """Process a JSON event from the device.
+        """Process and publish a JSON event from the device."""
 
-        Args:
-            jsonl: JSON line to decode
-        """
         try:
             decoded = json.loads(jsonl)
         except json.JSONDecodeError as e:
-            self._log.warning("ignoring invalid JSON from device: %s (error: %s)", jsonl, e)
+            self._log.warning("Invalid JSON: %s (error: %s)", jsonl, e)
             return
 
-        self._log.info("[Serial JSON] %s", decoded)
+        self._log.info("[Device -> MQTT] %s", decoded)
+        self._mqtt.publish(f"whac/{self.device_id}/game_events", jsonl)
 
-        # TODO: Add MQTT support
-        #
-        # When adding MQTT:
-        #   1. Make run() and _read_events()
-        #   2. Add ThreadPoolExecutor for blocking serial I/O
-        #   3. Connect to MQTT broker: Client(broker, port, identifier=f"bridge-{device_id}")
-        #   4. Run serial reading and MQTT concurrently: asyncio.gather(read_task, mqtt_task)
-        #   5. Publish events: await mqtt.publish(f"whac/{device_id}/events", json_line, qos=1)
-        #   6. Subscribe to commands: await mqtt.subscribe(f"whac/{device_id}/commands")
-        #   7. Forward commands to serial: serial.write(command.encode() + b"\n")
-        #
-        # Example command from MQTT to device:
-        #   {"command":"pause"}
-        #   {"command":"start"}
-        #   {"command":"reset"}
+    def _on_message(self, client: Client, userdata: Any, message: MQTTMessage) -> None:  # noqa: ANN401
+        """Forward MQTT command to serial device as single-byte command."""
+        _ = client, userdata
+        if self._serial is None:
+            return
+
+        cmd = message.payload.decode().strip()
+        if cmd == "P":
+            self._log.info("[MQTT -> Device] %s", cmd)
+            self._serial.write(b"P")

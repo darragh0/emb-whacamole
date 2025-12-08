@@ -1,20 +1,21 @@
 [project]
-name = "agent"
+name = "cloud"
 version = "0.1.0"
-description = "Serial-to-MQTT bridge for Whacamole game"
+description = "MQTT backend + dashboard for Whacamole game"
 readme = "README.md"
 license-file = "../LICENSE"
 authors = [{ name = "darragh0" }, { name = "jjola00" }, { name = "tomjoyce1" }]
 requires-python = ">=3.12"
 dependencies = [
-  "pyserial>=3.5",
-  "rich-argparse>=1.7.2",
-  "paho-mqtt>=1.6",
+  "fastapi>=0.124.0",
+  "paho-mqtt>=2.1.0",
   "python-dotenv>=1.2.1",
+  "python-multipart>=0.0.20",
+  "uvicorn>=0.38.0",
 ]
 
 [project.scripts]
-agent = "agent.__main__:main"
+cloud = "cloud.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.8.11,<0.9.0"]
