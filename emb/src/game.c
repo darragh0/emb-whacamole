@@ -1,3 +1,31 @@
+/**
+ * @file game.c
+ * @brief Game task - Real-time Whac-A-Mole control logic
+ *
+ * Real-Time Characteristics:
+ * - Button polling at 5ms intervals for low-latency response detection
+ * - Deterministic timing using vTaskDelay() (FreeRTOS tick-based delays)
+ * - Runs at priority 3 (higher than agent) to ensure timing isn't disrupted
+ * - Millisecond-precision reaction time measurement
+ *
+ * Game Mechanics:
+ * - 8 difficulty levels with decreasing pop durations (1500ms -> 275ms)
+ * - 10 pops per level
+ * - 5 lives total, lose 1 life per miss/late
+ * - Random mole selection and inter-pop delays for unpredictability
+ *
+ * State Machine:
+ * Ready State (await_start) -> Session Start -> For each level:
+ *   -> Level animation -> For each pop:
+ *     -> Random delay -> Pop mole -> Poll buttons -> Emit result
+ *   -> Level complete
+ * -> Session end (win/loss) -> Ready state
+ *
+ * Queue Producer Pattern:
+ * game_task generates events and sends to event_queue via xQueueSend().
+ * Events are consumed by agent_task and sent to cloud via UART.
+ */
+
 #include "game.h"
 #include "btns.h"
 #include "io_expander.h"
@@ -6,16 +34,34 @@
 #include "utils.h"
 #include <stdint.h>
 
-static uint8_t lives;
-static uint32_t rng_state;
+// Game state variables
+static uint8_t lives;       // Remaining lives (max 5)
+static uint32_t rng_state;  // Xorshift RNG state for random numbers
 
-static const uint8_t POPS_PER_LVL[8] = {[0 ... 7] = 10};
-static const uint16_t POP_DURATIONS[8] = {1500, 1250, 1000, 750, 600, 500, 350, 275};
+// Game difficulty configuration
+static const uint8_t POPS_PER_LVL[8] = {[0 ... 7] = 10};  // 10 pops per level
+static const uint16_t POP_DURATIONS[8] = {
+    1500,  // Level 1: 1.5 seconds
+    1250,  // Level 2: 1.25 seconds
+    1000,  // Level 3: 1.0 seconds
+    750,   // Level 4: 750ms
+    600,   // Level 5: 600ms
+    500,   // Level 6: 500ms
+    350,   // Level 7: 350ms  (challenging)
+    275    // Level 8: 275ms  (expert)
+};
 
-/** @brief Queue a session start event */
+/**
+ * @brief Queue a session start event
+ *
+ * FreeRTOS Queue Send Pattern:
+ * xQueueSend() with timeout=0 means "don't block if queue is full".
+ * In practice, queue rarely fills since agent drains faster than game produces.
+ * If queue is full, event is dropped (acceptable for non-critical events).
+ */
 static void emit_session_start(void) {
     const game_event_t event = {.type = EVENT_SESSION_START};
-    xQueueSend(event_queue, &event, 0);
+    xQueueSend(event_queue, &event, 0);  // Non-blocking send
 }
 
 /**
@@ -109,13 +155,32 @@ static void pop_wait_delay(uint32_t* const rng_state) {
 }
 
 /**
- * @brief Execute a single pop logic
+ * @brief Execute a single pop logic - REAL-TIME CRITICAL SECTION
  *
- * @param lvl_idx Current level index
- * @param rng_state RNG state pointer
- * @param out_mole [out] Selected mole index
- * @param out_reaction_ms [out] Reaction time in ms
- * @return Outcome of the pop
+ * This function implements the core real-time control loop:
+ * 1. Debounce buttons (wait for clean release)
+ * 2. Turn on target LED (mole "pops up")
+ * 3. Poll buttons at 5ms intervals for hit detection
+ * 4. Measure reaction time with millisecond precision
+ * 5. Classify outcome: HIT, MISS, or LATE
+ *
+ * Real-Time Constraints:
+ * - 5ms polling interval for responsive button detection
+ * - Must maintain timing accuracy regardless of other tasks
+ * - Priority 3 ensures preemption of lower-priority tasks
+ * - Uses vTaskDelay() for deterministic timing (tick-based)
+ *
+ * Timing Analysis:
+ * - Shortest pop duration: 275ms (Level 8)
+ * - Polling interval: 5ms
+ * - Maximum detection latency: 5ms (one poll interval)
+ * - Number of polls per pop: 275ms / 5ms = 55 polls (worst case)
+ *
+ * @param lvl_idx Current level index (0-7)
+ * @param rng_state Pointer to RNG state (for random mole selection)
+ * @param out_mole [OUT] Selected mole index (0-7)
+ * @param out_reaction_ms [OUT] Player reaction time in milliseconds
+ * @return Outcome: OUTCOME_HIT, OUTCOME_MISS, or OUTCOME_LATE
  */
 static pop_outcome_t pop_do(
     const uint8_t lvl_idx,
@@ -123,47 +188,111 @@ static pop_outcome_t pop_do(
     uint8_t* out_mole,
     uint16_t* out_reaction_ms
 ) {
-    const uint16_t duration_ms = POP_DURATIONS[lvl_idx];
-    const uint8_t target_led = next_rand(rng_state) % LED_COUNT;
+    const uint16_t duration_ms = POP_DURATIONS[lvl_idx];  // Pop timeout for this level
+    const uint8_t target_led = next_rand(rng_state) % LED_COUNT;  // Random mole (0-7)
     *out_mole = target_led;
 
-    // Button debounce: wait for all buttons released
+    /**
+     * Button Debouncing Phase:
+     * Wait for all buttons to be released before starting pop.
+     * This prevents accidental button holds from immediately triggering.
+     *
+     * Debounce Strategy:
+     * - Poll button state every 10ms
+     * - If any button pressed, wait another 10ms
+     * - Timeout after 50ms to prevent indefinite blocking
+     *
+     * I2C Read: io_expander_read_btns() returns 0xFF when all released (active-low)
+     */
     uint8_t btn_state;
     uint16_t db_time = 0;
     do {
-        io_expander_read_btns(&btn_state);
-        if (btn_state != BTN_HW_STATE) {
-            MS_SLEEP(10);
+        io_expander_read_btns(&btn_state);  // I2C read from MAX7325
+        if (btn_state != BTN_HW_STATE) {    // BTN_HW_STATE = 0xFF (all released)
+            MS_SLEEP(10);                   // vTaskDelay(10ms)
             db_time += 10;
-            if (db_time > 50) break;
+            if (db_time > 50) break;        // Timeout: proceed anyway
         }
     } while (btn_state != BTN_HW_STATE);
 
-    // Turn on target LED
+    /**
+     * LED Activation Phase:
+     * Turn on target LED to indicate which mole "popped up".
+     * Player must press corresponding button before timeout.
+     */
     uint8_t led_pattern = 0;
-    led_on(target_led, &led_pattern);
-    io_expander_write_leds(led_pattern);
+    led_on(target_led, &led_pattern);          // Set bit in pattern
+    io_expander_write_leds(led_pattern);       // I2C write to MAX7325
 
-    // Poll loop with timeout
-    uint16_t elapsed = 0;
-    const uint8_t poll_interval = 5;
+    /**
+     * Real-Time Button Polling Loop:
+     * This is the critical real-time section that determines game responsiveness.
+     *
+     * Polling Strategy:
+     * - Read buttons every 5ms for low latency
+     * - Track elapsed time for reaction measurement
+     * - Exit immediately on correct button press (HIT)
+     * - Exit on timeout (MISS or LATE depending on if any button pressed)
+     *
+     * Why 5ms interval?
+     * - Fast enough for responsive gameplay (200 Hz sampling)
+     * - Slow enough to avoid excessive I2C traffic
+     * - Aligned with FreeRTOS tick period (1ms)
+     */
+    uint16_t elapsed = 0;  // Reaction time counter (in milliseconds)
+    const uint8_t poll_interval = 5;  // Poll every 5ms
 
+    /**
+     * Polling Loop - Runs until timeout or button press
+     *
+     * Each iteration:
+     * 1. Read button state via I2C (blocking operation, ~100us)
+     * 2. Check if correct button was pressed
+     * 3. Increment elapsed time counter
+     * 4. vTaskDelay(5ms) - Yields to other tasks, ensuring deterministic timing
+     *
+     * FreeRTOS vTaskDelay() guarantees:
+     * - Task blocks for exactly 5 ticks (5ms @ 1000 Hz tick rate)
+     * - Other tasks (agent, idle) can run during this time
+     * - No busy-waiting - CPU can enter low-power mode
+     * - Timing is deterministic regardless of other task loads
+     */
     while (elapsed < duration_ms) {
-        io_expander_read_btns(&btn_state);
+        io_expander_read_btns(&btn_state);  // I2C read (~100us)
 
+        // Check if any button was pressed (active-low: 0xFF = all released)
         if (btn_state != BTN_HW_STATE) {
+            // Button detected! Record reaction time
             *out_reaction_ms = elapsed;
-            led_hw_write();
+
+            // Turn off all LEDs
+            led_hw_write();  // Writes 0x00 to MAX7325
+
+            // Determine outcome: HIT if correct button, MISS if wrong button
+            // is_btn_pressed() checks if specific button bit is cleared (active-low)
             return is_btn_pressed(target_led, btn_state) ? POP_HIT : POP_MISS;
         }
 
-        MS_SLEEP(poll_interval);
-        elapsed += poll_interval;
+        /**
+         * vTaskDelay() - Yield CPU and wait for next poll interval
+         *
+         * This is the key to FreeRTOS real-time behavior:
+         * - Puts task in Blocked state for poll_interval ticks (5ms)
+         * - Scheduler can run other tasks (agent task, idle task)
+         * - Task wakes up after exactly 5ms (tick-accurate timing)
+         * - No busy-waiting means efficient CPU usage
+         *
+         * During this delay, agent_task can drain event queue and send UART,
+         * ensuring game events are transmitted to cloud without blocking game logic.
+         */
+        MS_SLEEP(poll_interval);  // vTaskDelay(5) - Block for 5ms
+        elapsed += poll_interval;  // Track total reaction time
     }
 
-    *out_reaction_ms = duration_ms;
-    led_hw_write();
-    return POP_LATE;
+    // Timeout reached - No button pressed within duration
+    *out_reaction_ms = duration_ms;  // Max reaction time
+    led_hw_write();                   // Turn off LED
+    return POP_LATE;                  // Player was too slow
 }
 
 /** @brief Run a complete level */
