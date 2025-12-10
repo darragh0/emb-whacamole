@@ -2,59 +2,51 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Whac-A-Mole</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Whac-A-Mole Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="icon" type="image/x-icon" href="/static/ico/favicon.ico" />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            },
+            colors: {
+              gray: {
+                750: '#2a2f3a',
+                850: '#1a1d24',
+                950: '#0f1115',
+              },
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="stylesheet" href="/static/css/dashboard.css" />
   </head>
-  <body class="bg-gray-900 text-gray-100 p-6 font-mono">
-    <div class="max-w-4xl mx-auto">
-      <div class="flex justify-between items-center mb-4">
-        <h1 class="text-xl font-bold">Whac-A-Mole</h1>
-        <button
-          id="pauseBtn"
-          onclick="togglePause()"
-          class="bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold py-2 px-6 rounded"
-        >
-          Pause
-        </button>
-      </div>
-      <div class="bg-gray-800 rounded p-4 h-96 overflow-y-auto" id="log">
-        <div class="text-gray-500">Loading...</div>
+  <body class="bg-gray-950 text-gray-100 min-h-screen font-sans">
+    <div class="max-w-7xl mx-auto px-6 py-8">
+      <header class="mb-8">
+        <h1 class="text-3xl font-bold text-white tracking-tight">Whac-A-Mole</h1>
+        <p class="text-gray-400 text-sm mt-1">Device Dashboard</p>
+      </header>
+
+      <div id="devices" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="col-span-full flex items-center justify-center py-16 text-gray-500">
+          <div class="text-center">
+            <div class="text-5xl mb-4 opacity-50">&#128225;</div>
+            <div class="text-lg">Loading devices...</div>
+          </div>
+        </div>
       </div>
     </div>
-    <script>
-      let paused = false;
-      let refrate = 500;
 
-      async function togglePause() {
-        await fetch("/command/whacamole-dev", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: "command=P",
-        });
-        paused = !paused;
-        const btn = document.getElementById("pauseBtn");
-        btn.textContent = paused ? "Resume" : "Pause";
-        btn.className = paused
-          ? "bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded"
-          : "bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold py-2 px-6 rounded";
-      }
-
-      async function refresh() {
-        const res = await fetch("/events");
-        const events = await res.json();
-        const log = document.getElementById("log");
-        if (events.length === 0) {
-          log.innerHTML = '<div class="text-gray-500">No events yet</div>';
-        } else {
-          log.innerHTML = events
-            .map((e) => `<div class="py-1 text-xs">${e}</div>`)
-            .join("");
-        }
-      }
-
-      refresh();
-      setInterval(refresh, refrate);
-    </script>
+    <script src="/static/js/dashboard.js"></script>
   </body>
 </html>

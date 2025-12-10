@@ -10,23 +10,23 @@ static const char* const OUTCOME_STR[] = {"hit", "miss", "late"};
  *
  * @param event Event to send
  */
-static void send_event_json(const game_event_t* event) {
+static void send_event_json(const game_event_t* const event) {
     switch (event->type) {
         case EVENT_SESSION_START:
-            printf("{\"event_type\":\"session_start\",\"time\":%lu}\n", event->timestamp);
+            printf("{\"event_type\":\"session_start\"}\n");
             break;
 
         case EVENT_POP_RESULT:
             printf(
                 "{\"event_type\":\"pop_result\",\"mole_id\":%u,\"outcome\":\"%s\","
-                "\"reaction_ms\":"
-                "%"
-                "u,\"lives\":%u,\"lvl\":%u}\n",
+                "\"reaction_ms\":%u,\"lives\":%u,\"lvl\":%u,\"pop\":%u,\"pops_total\":%u}\n",
                 event->data.pop.mole,
                 OUTCOME_STR[event->data.pop.outcome],
                 event->data.pop.reaction_ms,
                 event->data.pop.lives,
-                event->data.pop.level
+                event->data.pop.level,
+                event->data.pop.pop_index,
+                event->data.pop.pops_total
             );
             break;
 

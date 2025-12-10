@@ -52,6 +52,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "paho-mqtt" },
+    { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "uvicorn" },
@@ -61,6 +62,7 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.124.0" },
     { name = "paho-mqtt", specifier = ">=2.1.0" },
+    { name = "pydantic", specifier = ">=2.10.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "uvicorn", specifier = ">=0.38.0" },

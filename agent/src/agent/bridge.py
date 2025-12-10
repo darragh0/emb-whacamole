@@ -5,13 +5,23 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Final, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal, cast
 
-from paho.mqtt.client import Client, MQTTMessage
+from paho.mqtt.client import Client, ConnectFlags, DisconnectFlags, MQTTMessage
+from paho.mqtt.enums import CallbackAPIVersion
+from rich.status import Status
 from serial import Serial, SerialException
+from serial.tools import list_ports
+
+from .utils import time_now_ms
 
 if TYPE_CHECKING:
     from logging import Logger
+
+    from paho.mqtt.properties import Properties
+    from paho.mqtt.reasoncodes import ReasonCode
+
+    from .types import DevStatus, StandardPayload, StatusPayload
 
 RECONNECT_TIMEOUT_SECS: Final = 600
 RECONNECT_RETRY_INTERVAL: Final = 2  # secs
@@ -19,6 +29,12 @@ RECONNECT_RETRY_INTERVAL: Final = 2  # secs
 
 class Bridge:
     """Bridges UART device to MQTT broker."""
+
+    type Topic = Literal["state", "commands", "game_events"]
+
+    TOPIC_NAMESPACE: ClassVar = "whac"
+    VALID_COMMANDS: ClassVar[dict[bytes, str]] = {b"P": "pause toggle"}
+    BYTES_ENCODING: ClassVar = "ascii"
 
     mqtt_broker: str
     mqtt_port: int
@@ -47,15 +63,25 @@ class Bridge:
 
         self._log = logging.getLogger("Bridge")
         self._serial = None  # Initialize later in `self.run`
-        self._mqtt = Client(client_id=f"agent-{device_id}")
+        self._mqtt = Client(client_id=f"bridge-{device_id}", callback_api_version=CallbackAPIVersion.VERSION2)
+
         self._mqtt.on_message = self._on_message
+        self._mqtt.on_connect = self._on_connect
+        self._mqtt.on_disconnect = self._on_disconnect
+        self._mqtt.reconnect_delay_set(min_delay=1, max_delay=30)
+
+    ####################################################### Pub ########################################################
 
     def run(self) -> None:
         """Connect to MQTT and UART, then process events."""
 
-        self._log.info("Connecting to MQTT broker %s", self.mqtt_broker)
-        self._mqtt.connect(self.mqtt_broker, self.mqtt_port)
-        self._mqtt.subscribe(f"whac/{self.device_id}/commands")
+        # Set Last Will - broker publishes this if agent disconnects unexpectedly
+        pload = self._payload(status="offline")
+        topic = self._topic("state")
+        self._mqtt.will_set(topic, payload=json.dumps(pload), qos=1, retain=True)
+
+        self._log.info("Connecting to MQTT broker %s:%d", self.mqtt_broker, self.mqtt_port)
+        self._mqtt.connect_async(self.mqtt_broker, self.mqtt_port, keepalive=30)
         self._mqtt.loop_start()
 
         self._log.info("Connecting to %s (%d baud)", self.serial_port, self.baud_rate)
@@ -67,6 +93,7 @@ class Bridge:
             return
 
         self._log.info("Connected to %s", self.serial_port)
+        self._publish_state("online")
 
         try:
             self._read_events()
@@ -83,35 +110,42 @@ class Bridge:
                 line_bytes = cast("Serial", self._serial).readline()
             except SerialException as e:
                 self._log.error("Serial read error: %s", e)
+
+                status: DevStatus
+                if not self._device_connected():
+                    self._log.error("Device unplugged, exiting")
+                    status = "offline"
+                elif self._wait_for_reconnect():
+                    self._publish_state("online")
+                    continue
+                else:
+                    status = "serial_error"
+
+                self._publish_state(status)
                 cast("Serial", self._serial).close()
-                if not self._wait_for_reconnect():
-                    break
-                continue
+                return
 
-            if not line_bytes:
-                continue
-
-            line = line_bytes.decode("utf-8", errors="replace").strip()
+            line = line_bytes.decode(Bridge.BYTES_ENCODING, errors="replace").strip()
             if line.startswith("{"):
                 self._process_event(line)
+            # Ignore other lines
 
     def _wait_for_reconnect(self) -> bool:
         """Wait for serial device to reconnect. Returns True if reconnected."""
-        start = time.monotonic()
-
-        self._log.info(
-            "Waiting for device to reconnect (timeout: %ds)...",
-            RECONNECT_TIMEOUT_SECS,
-        )
-
-        while time.monotonic() - start < RECONNECT_TIMEOUT_SECS:
-            try:
-                self._serial = Serial(self.serial_port, self.baud_rate, timeout=0.1)
-            except SerialException:
-                time.sleep(RECONNECT_RETRY_INTERVAL)
-            else:
-                self._log.info("Reconnected to %s", self.serial_port)
-                return True
+        with Status("") as status:
+            start = time.monotonic()
+            while (elapsed := time.monotonic() - start) < RECONNECT_TIMEOUT_SECS:
+                remaining = int(RECONNECT_TIMEOUT_SECS - elapsed)
+                status.update(f"Reconnecting ({remaining}s remaining)")
+                try:
+                    self._serial = Serial(self.serial_port, self.baud_rate, timeout=0.1)
+                except SerialException:
+                    if self._serial is not None:
+                        self._serial.close()
+                    time.sleep(RECONNECT_RETRY_INTERVAL)
+                else:
+                    self._log.info("Reconnected to %s", self.serial_port)
+                    return True
 
         self._log.error("Reconnect timeout after %ds", RECONNECT_TIMEOUT_SECS)
         return False
@@ -120,19 +154,100 @@ class Bridge:
         """Process and publish a JSON event from the device."""
 
         try:
-            decoded = json.loads(jsonl)
+            event = json.loads(jsonl)
         except json.JSONDecodeError as e:
             self._log.warning("Invalid JSON: %s (error: %s)", jsonl, e)
             return
 
-        self._log.info("[Device -> MQTT] %s", decoded)
-        self._mqtt.publish(f"whac/{self.device_id}/game_events", jsonl)
+        # Enrich with device_id and timestamp
+        event |= self._payload()
+
+        self._log.debug("[bright_white on grey30][Device -> MQTT][/] %s", event)
+        topic = self._topic("game_events")
+        self._mqtt.publish(topic, json.dumps(event), qos=1)
+
+    def _publish_state(self, status: DevStatus | None = None) -> None:
+        """Publish current device state to MQTT.
+
+        Optional Args:
+            status: Device status (connected, serial_error, offline)
+        """
+        pload = self._payload(status=status)
+        topic = self._topic("state")
+        self._log.debug("[bright_white on grey30][Agent -> MQTT][/] %s", pload)
+        self._mqtt.publish(topic, payload=json.dumps(pload), qos=1, retain=True)
+
+    ####################################################### Sub ########################################################
 
     def _on_message(self, client: Client, userdata: Any, message: MQTTMessage) -> None:  # noqa: ANN401
         """Forward MQTT command to serial device as single-byte command."""
+
+        byte = message.payload
+        if byte not in Bridge.VALID_COMMANDS:
+            self._log.warning('[MQTT -> Device] INVALID COMMAND: "%s"', byte)
+            return
+
+        self._log.info("[bright_white on grey30][MQTT -> Device][/] P (%s)", Bridge.VALID_COMMANDS[byte])
+        cast("Serial", self._serial).write(byte)
+
         _ = client, userdata
 
-        cmd = message.payload.decode().strip()
-        if cmd == "P":
-            self._log.info("[MQTT -> Device] %s", cmd)
-            cast("Serial", self._serial).write(b"P")
+    ################################################ Utility Functions #################################################
+
+    def _payload(self, *, status: DevStatus | None = None) -> StandardPayload | StatusPayload:
+        """Return a JSON payload to be sent.
+
+        Optional Keyword Arguments:
+            status: Device status
+        """
+        pload: StandardPayload = {"device_id": self.device_id, "ts": time_now_ms()}
+        if status is not None:
+            return {**pload, "status": status}
+        return pload
+
+    def _topic(self, topic: Bridge.Topic) -> str:
+        """Return a MQTT topic string for a given topic type.
+
+        Args:
+            topic: Topic type
+        """
+        return f"{Bridge.TOPIC_NAMESPACE}/{self.device_id}/{topic}"
+
+    def _device_connected(self) -> bool:
+        """Check if the serial device is still physically connected."""
+        available = [p.device for p in list_ports.comports()]
+        return self.serial_port in available
+
+    ############################################### Connection Callbacks ###############################################
+
+    def _on_connect(
+        self,
+        client: Client,
+        userdata: Any,  # noqa: ANN401
+        connect_flags: ConnectFlags,
+        reason_code: ReasonCode,
+        properties: Properties | None = None,
+    ) -> None:
+        """Handle MQTT connection."""
+
+        if not reason_code.is_failure:
+            self._log.info("Connected to MQTT %s:%d", self.mqtt_broker, self.mqtt_port)
+            topic = self._topic("commands")
+            client.subscribe(topic, qos=1)
+            return
+
+        self._log.warning("MQTT connect failed with rc=%s", reason_code)
+        _ = userdata, connect_flags, properties
+
+    def _on_disconnect(
+        self,
+        client: Client,
+        userdata: Any,  # noqa: ANN401
+        disconnect_flags: DisconnectFlags,
+        reason_code: ReasonCode,
+        properties: Properties | None = None,
+    ) -> None:
+        """Handle MQTT disconnection."""
+
+        self._log.warning("MQTT disconnected (rc=%s), will attempt reconnect", reason_code)
+        _ = client, userdata, disconnect_flags, properties

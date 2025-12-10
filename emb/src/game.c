@@ -14,10 +14,7 @@ static const uint16_t POP_DURATIONS[8] = {1500, 1250, 1000, 750, 600, 500, 350, 
 
 /** @brief Queue a session start event */
 static void emit_session_start(void) {
-    game_event_t event = {
-        .type = EVENT_SESSION_START,
-        .timestamp = xTaskGetTickCount(),
-    };
+    const game_event_t event = {.type = EVENT_SESSION_START};
     xQueueSend(event_queue, &event, 0);
 }
 
@@ -28,18 +25,27 @@ static void emit_session_start(void) {
  * @param outcome Outcome of the pop
  * @param reaction_ms Reaction time in ms
  * @param lvl Current level
+ * @param pop_idx Current pop index (1-based)
+ * @param pops_total Total pops in this level
  */
-static void
-emit_pop_result(uint8_t mole, pop_outcome_t outcome, uint16_t reaction_ms, uint8_t lvl) {
-    game_event_t event = {
+static void emit_pop_result(
+    const uint8_t mole,
+    const pop_outcome_t outcome,
+    const uint16_t reaction_ms,
+    const uint8_t lvl,
+    const uint8_t pop_idx,
+    const uint8_t pops_total
+) {
+    const game_event_t event = {
         .type = EVENT_POP_RESULT,
-        .timestamp = xTaskGetTickCount(),
         .data.pop = {
             .mole = mole,
             .outcome = outcome,
             .reaction_ms = reaction_ms,
             .lives = lives,
             .level = lvl + 1,
+            .pop_index = pop_idx,
+            .pops_total = pops_total,
         },
     };
     xQueueSend(event_queue, &event, 0);
@@ -50,10 +56,9 @@ emit_pop_result(uint8_t mole, pop_outcome_t outcome, uint16_t reaction_ms, uint8
  *
  * @param lvl Current level
  */
-static void emit_level_complete(uint8_t lvl) {
-    game_event_t event = {
+static void emit_level_complete(const uint8_t lvl) {
+    const game_event_t event = {
         .type = EVENT_LEVEL_COMPLETE,
-        .timestamp = xTaskGetTickCount(),
         .data.level_complete.level = lvl + 1,
     };
     xQueueSend(event_queue, &event, 0);
@@ -64,10 +69,9 @@ static void emit_level_complete(uint8_t lvl) {
  *
  * @param won Whether session was won
  */
-static void emit_session_end(bool won) {
-    game_event_t event = {
+static void emit_session_end(const bool won) {
+    const game_event_t event = {
         .type = EVENT_SESSION_END,
-        .timestamp = xTaskGetTickCount(),
         .data.session_end.won = won,
     };
     xQueueSend(event_queue, &event, 0);
@@ -88,7 +92,7 @@ static inline void feedback_win(void) { led_flash(0xFF, 100, 50); }
  * @param lvl_idx Level index
  */
 static void lvl_show(const uint8_t lvl_idx) {
-    uint8_t num_leds = lvl_idx + 1;
+    const uint8_t num_leds = lvl_idx + 1;
     uint8_t led_pattern = 0x00;
 
     for (uint8_t i = 0; i < num_leds; i++) led_on(i, &led_pattern);
@@ -100,7 +104,7 @@ static void lvl_show(const uint8_t lvl_idx) {
 
 /** @brief Wait a random amount of time before next pop */
 static void pop_wait_delay(uint32_t* const rng_state) {
-    uint32_t delay = 250 + (next_rand(rng_state) % 751);
+    const uint32_t delay = 250 + (next_rand(rng_state) % 751);
     MS_SLEEP(delay);
 }
 
@@ -119,8 +123,8 @@ static pop_outcome_t pop_do(
     uint8_t* out_mole,
     uint16_t* out_reaction_ms
 ) {
-    uint16_t duration_ms = POP_DURATIONS[lvl_idx];
-    uint8_t target_led = next_rand(rng_state) % LED_COUNT;
+    const uint16_t duration_ms = POP_DURATIONS[lvl_idx];
+    const uint8_t target_led = next_rand(rng_state) % LED_COUNT;
     *out_mole = target_led;
 
     // Button debounce: wait for all buttons released
@@ -173,23 +177,17 @@ static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
         uint16_t reaction_ms;
         pop_outcome_t outcome = pop_do(lvl_idx, &rng_state, &mole, &reaction_ms);
 
-        // printf("  Pop %02d :: ", pop + 1);
         switch (outcome) {
             case POP_HIT:
-                // printf("[HIT]  %3d ms\n", reaction_ms);
-                emit_pop_result(mole, outcome, reaction_ms, lvl_idx);
+                emit_pop_result(mole, outcome, reaction_ms, lvl_idx, pop + 1, pops);
                 continue;
             case POP_MISS:
-                // printf("[MISS]");
-                break;
             case POP_LATE:
-                // printf("[LATE]");
                 break;
         }
 
         lives--;
-        emit_pop_result(mole, outcome, reaction_ms, lvl_idx);
-        // printf("      (Lives: %d)\n", lives);
+        emit_pop_result(mole, outcome, reaction_ms, lvl_idx, pop + 1, pops);
         feedback_late_or_miss();
         if (lives == 0) return;
     }

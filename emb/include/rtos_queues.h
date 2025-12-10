@@ -33,7 +33,6 @@ typedef enum {
 /** @brief Game event structure */
 typedef struct {
     event_type_t type;
-    uint32_t timestamp; // xTaskGetTickCount() value
     union {
         struct {
             uint8_t mole;
@@ -41,6 +40,8 @@ typedef struct {
             uint16_t reaction_ms;
             uint8_t lives;
             uint8_t level;
+            uint8_t pop_index;
+            uint8_t pops_total;
         } pop;
         struct {
             uint8_t level;

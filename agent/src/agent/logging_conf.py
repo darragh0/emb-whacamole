@@ -1,63 +1,49 @@
-import json
 import logging
-import sys
-from logging.config import dictConfig
-from pathlib import Path
-from typing import ClassVar, Final
+import time
+from typing import ClassVar
 
-FILE_DIR: Final = Path(__file__).parent
-BASE_DIR: Final = FILE_DIR.parents[1]
-CONFIG_PATH: Final = BASE_DIR / "config" / "logging.json"
+from rich.console import Console
 
 
-class StdFormatter(logging.Formatter):
-    """Logging formatter for stdout & stderr."""
+class RichStyleHandler(logging.Handler):
+    """Logging handler with Rich markup support and custom format."""
 
-    _COLORS: ClassVar = {
-        logging.DEBUG: "\x1b[92m",
-        logging.INFO: "\x1b[96m",
-        logging.WARNING: "\x1b[93m",
-        logging.ERROR: "\x1b[91m",
-        logging.CRITICAL: "\x1b[1;91m",
+    LEVEL_COLORS: ClassVar = {
+        logging.DEBUG: "green",
+        logging.INFO: "cyan",
+        logging.WARNING: "yellow",
+        logging.ERROR: "red",
+        logging.CRITICAL: "bold red",
     }
 
-    def __init__(self, *, fmt: str | None = None, datefmt: str | None = None) -> None:
-        super().__init__(fmt=fmt, datefmt=datefmt)
+    def __init__(self) -> None:
+        super().__init__()
+        self._stdout = Console()
+        self._stderr = Console(stderr=True)
 
-    def format(self, record: logging.LogRecord) -> str:
-        fmt: str | None = None
-        if self._fmt is not None:
-            lvl_clr = StdFormatter._COLORS[record.levelno]
-            msg_clr = StdFormatter._COLORS[record.levelno] if record.levelno > logging.INFO else ""
-            fmt = (
-                self._fmt.replace("<color>", lvl_clr)
-                .replace("</color>", "\x1b[0m")
-                .replace("<color_if_err>", msg_clr)
-                .replace("</color_if_err>", "\x1b[0m")
-            )
-        else:
-            fmt = None
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            color = self.LEVEL_COLORS[record.levelno]
+            lvl = record.levelname[:3].upper()
+            time_str = time.strftime("%X")
+            msg = self.format(record)
 
-        fmted: str = logging.Formatter(fmt=fmt, datefmt=self.datefmt).format(record)
-        return fmted
+            # Color message for WARNING+ only (like original)
+            cons: Console
+            if record.levelno >= logging.WARNING:
+                msg = f"[{color}]{msg}[/]"
+                cons = self._stderr
+            else:
+                cons = self._stdout
 
-
-class DismissErrorsFilter(logging.Filter):
-    """Filter for dismissing errors."""
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        return record.levelno < logging.WARNING
+            cons.print(f"[dim][{color}][{lvl}][/] [white]({time_str})[/] ::[/] {msg}")
+        except Exception:  # noqa: BLE001 (standard logging.Handler pattern)
+            self.handleError(record)
 
 
 def init_logging() -> None:
-    """Initialize logging for application."""
-
-    sys.path.append(str(FILE_DIR))
-    if not CONFIG_PATH.is_file():
-        msg = f"\x1b[1;91merror:\x1b[0m logging config file moved or deleted -- need \x1b[96m{CONFIG_PATH}\x1b[0m"
-        print(msg, file=sys.stderr)
-        sys.exit(1)
-
-    with Path.open(CONFIG_PATH) as file:
-        cfg = json.load(file)
-        dictConfig(cfg)
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(message)s",
+        handlers=[RichStyleHandler()],
+    )

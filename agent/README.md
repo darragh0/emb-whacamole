@@ -28,16 +28,14 @@ pip install .        # or `pip install -e .` for development
 
 ```
 .
-├── config
-│   └── logging.json                      # Config for console logging (stdout/stderr)
 ├── pyproject.toml
 ├── README.md
 ├── ruff.toml
-└─── src
-     └── agent
-         ├── argparser.py                  # Argument parser setup
-         ├── bridge.py                     # Main serial interaction code
-         ├── __init__.py
-         ├── logging_conf.py               # Logging config (for logging.json, can ignore this)
-         └── __main__.py                   # Main entry point
+└── src
+    └── agent
+        ├── argparser.py       # Argument parser setup
+        ├── bridge.py          # Main serial interaction code
+        ├── __init__.py
+        ├── logging_conf.py    # Rich logging setup
+        └── __main__.py        # Main entry point
 ```

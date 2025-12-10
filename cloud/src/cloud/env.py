@@ -1,12 +1,8 @@
 import os
 import sys
-from pathlib import Path
 from typing import Final, NoReturn, cast
 
 from dotenv import load_dotenv
-
-PROJ_ROOT: Final = Path(__file__).parents[2]
-DATA_FILE: Final = PROJ_ROOT / "data" / "events.jsonl"
 
 PORT_MIN: Final = 1
 PORT_MAX: Final = 65535

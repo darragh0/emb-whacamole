@@ -9,6 +9,7 @@ requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.124.0",
   "paho-mqtt>=2.1.0",
+  "pydantic>=2.10.0",
   "python-dotenv>=1.2.1",
   "python-multipart>=0.0.20",
   "uvicorn>=0.38.0",

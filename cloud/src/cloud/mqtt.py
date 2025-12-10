@@ -2,24 +2,21 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 from typing import TYPE_CHECKING, Any, Final
 
 from paho.mqtt import publish
-from paho.mqtt.client import Client
+from paho.mqtt.client import Client, ConnectFlags
+from paho.mqtt.enums import CallbackAPIVersion
 
 from .env import get_env_vars
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    import paho.mqtt.client as mqtt
-    from paho.mqtt.client import ConnectFlags
+    from paho.mqtt.client import MQTTMessage
     from paho.mqtt.properties import Properties
     from paho.mqtt.reasoncodes import ReasonCode
-
-    from cloud.types import GameEvent
 
 
 BROKER: Final
@@ -28,30 +25,17 @@ BROKER, PORT = get_env_vars()
 
 
 def send_pause(device_id: str) -> None:
-    """Publish pause (toggle) command to device.
-
-    Args:
-        device_id: Recipient device ID
-    """
     publish.single(
         f"whac/{device_id}/commands",
         "P",
         hostname=BROKER,
         port=PORT,
+        qos=1,
     )
 
 
-def subscribe(topics: list[str], handler: Callable[[GameEvent], None]) -> Client:
-    """Subscribe to topics.
-
-    Args:
-        topics: List of topics to subscribe to
-        handler: Handler for incoming messages
-
-    Returns:
-        MQTT client
-    """
-    mqttc = Client()
+def subscribe(topics: list[str], handler: Callable[[dict[str, Any], str], None]) -> Client:
+    mqttc = Client(client_id="cloud-dashboard", callback_api_version=CallbackAPIVersion.VERSION2)
 
     def on_connect(
         client: Client,
@@ -60,18 +44,18 @@ def subscribe(topics: list[str], handler: Callable[[GameEvent], None]) -> Client
         reason_code: ReasonCode,
         properties: Properties | None = None,
     ) -> None:
-        _ = client, userdata, flags, reason_code, properties
-        for t in topics:
-            mqttc.subscribe(t)
+        _ = client, userdata, flags, properties
+        if not reason_code.is_failure:
+            for t in topics:
+                mqttc.subscribe(t)
 
     def on_message(
         client: Client,
         userdata: Any,  # noqa: ANN401
-        message: mqtt.MQTTMessage,
+        message: MQTTMessage,
     ) -> None:
         _ = client, userdata
-        with contextlib.suppress(json.JSONDecodeError):
-            handler(json.loads(message.payload.decode()))
+        handler(json.loads(message.payload.decode()), message.topic)
 
     mqttc.on_connect = on_connect
     mqttc.on_message = on_message
