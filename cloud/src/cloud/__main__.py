@@ -90,7 +90,7 @@ def main() -> None:
     client = subscribe(topics, handle_message)
     threading.Thread(target=client.loop_forever, daemon=True).start()
 
-    uvicorn.run("cloud.app:app", host="0.0.0.0", port=8001)  # noqa: S104
+    uvicorn.run("cloud.app:app", host="0.0.0.0", port=8000)  # noqa: S104
 
 
 if __name__ == "__main__":
