@@ -1,6 +1,6 @@
 # Cloud
 
-MQTT backend + dashboard for the Whack-A-Mole game.
+MQTT backend + dashboard for the Whac-A-Mole game.
 
 ## Installation
 
