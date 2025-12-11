@@ -24,7 +24,7 @@ class DeviceState:
     """Tracks state of a device."""
 
     device_id: str
-    status: Literal["online", "serial_error", "offline"] = "online"
+    status: Literal["online", "serial_error", "offline"] = "offline"
     game_state: Literal["playing", "idle"] = "idle"
     last_seen: int = 0
     current_session: Session | None = None
