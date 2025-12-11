@@ -1,6 +1,6 @@
-# emb-whackamole
+# emb-whacamole
 
-Whack-A-Mole game for Analog Devices' [MAX32655 MCU](https://www.analog.com/en/products/max32655.html).
+Whac-A-Mole game for Analog Devices' [MAX32655 MCU](https://www.analog.com/en/products/max32655.html).
 
 ## Architecture
 

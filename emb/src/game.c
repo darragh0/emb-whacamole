@@ -1,6 +1,6 @@
 /**
  * @file game.c
- * @brief Game task - Real-time Whack-A-Mole control logic
+ * @brief Game task - Real-time Whac-A-Mole control logic
  *
  * Real-Time Characteristics:
  * - Button polling at 5ms intervals for low-latency response detection
