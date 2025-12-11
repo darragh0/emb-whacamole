@@ -17,6 +17,9 @@ from cloud.state import (
     devices_lock,
 )
 
+DEVICE_TIMEOUT_MS = 30_000  # 30 seconds - mark offline if no message received
+TIMEOUT_CHECK_INTERVAL = 5  # seconds between timeout checks
+
 
 def handle_message(data: dict[str, Any], topic: str) -> None:
     """Route MQTT messages to appropriate handlers."""
@@ -63,7 +66,6 @@ def handle_game_event(data: dict[str, Any]) -> None:
             devices[device_id] = DeviceState(device_id=device_id)
 
         device = devices[device_id]
-        device.status = "online"
         device.last_seen = ts
 
         if event_type == "session_start":
@@ -84,11 +86,23 @@ def handle_game_event(data: dict[str, Any]) -> None:
             device.current_session.events.append(data)
 
 
+def check_device_timeouts() -> None:
+    """Mark devices offline if they haven't sent messages recently."""
+    while True:
+        time.sleep(TIMEOUT_CHECK_INTERVAL)
+        now = int(time.time() * 1000)
+        with devices_lock:
+            for device in devices.values():
+                if device.status == "online" and (now - device.last_seen) > DEVICE_TIMEOUT_MS:
+                    device.status = "offline"
+
+
 def main() -> None:
     """Start MQTT subscriber and web server."""
     topics = ["whac/+/game_events", "whac/+/state"]
     client = subscribe(topics, handle_message)
     threading.Thread(target=client.loop_forever, daemon=True).start()
+    threading.Thread(target=check_device_timeouts, daemon=True).start()
 
     uvicorn.run("cloud.app:app", host="0.0.0.0", port=8001)  # noqa: S104
 

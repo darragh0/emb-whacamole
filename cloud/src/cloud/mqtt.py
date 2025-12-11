@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import socket
 from typing import TYPE_CHECKING, Any, Final
 
 from paho.mqtt import publish
@@ -65,7 +67,8 @@ def send_level(device_id: str, level: int) -> None:
 
 
 def subscribe(topics: list[str], handler: Callable[[dict[str, Any], str], None]) -> Client:
-    mqttc = Client(client_id="cloud-dashboard", callback_api_version=CallbackAPIVersion.VERSION2)
+    client_id = f"cloud-{socket.gethostname()}-{os.getpid()}"
+    mqttc = Client(client_id=client_id, callback_api_version=CallbackAPIVersion.VERSION2)
 
     def on_connect(
         client: Client,
