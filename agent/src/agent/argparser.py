@@ -17,7 +17,7 @@ def _mk_parser() -> ArgumentParser:
     )
 
     parser = ArgumentParser(
-        description="UART bridge for Whack-A-Mole device",
+        description="UART bridge for Whac-A-Mole device",
         formatter_class=RichHelpFormatter,
         usage="%(prog)s [cyan]-s [dim]P[/] \\[options][/]",
     )
