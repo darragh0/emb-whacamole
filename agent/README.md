@@ -1,6 +1,6 @@
 # Agent
 
-UART-to-MQTT bridge for the Whack-A-Mole game.
+UART-to-MQTT bridge for the Whac-A-Mole game.
 
 ## Installation
 
