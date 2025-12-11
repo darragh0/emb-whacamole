@@ -16,6 +16,18 @@ async function togglePause(deviceId) {
   await fetch(`/command/${encodeURIComponent(deviceId)}`, { method: "POST" });
 }
 
+async function sendReset(deviceId) {
+  await fetch(`/command/${encodeURIComponent(deviceId)}/reset`, {
+    method: "POST",
+  });
+}
+
+async function sendStart(deviceId) {
+  await fetch(`/command/${encodeURIComponent(deviceId)}/start`, {
+    method: "POST",
+  });
+}
+
 async function sendLevel(deviceId, level) {
   await fetch(`/command/${encodeURIComponent(deviceId)}/level/${level}`, {
     method: "POST",
@@ -25,6 +37,14 @@ async function sendLevel(deviceId, level) {
 function handleLevelButtonClick(deviceId, level) {
   if (!Number.isInteger(level) || level < 1 || level > 8) return;
   sendLevel(deviceId, level);
+}
+
+function handleReset(deviceId) {
+  sendReset(deviceId);
+}
+
+function handleStart(deviceId) {
+  sendStart(deviceId);
 }
 
 function formatRelativeTime(ms) {
@@ -171,6 +191,8 @@ function createDeviceCard(device) {
   const pauseDisabled = isOffline
     ? "disabled opacity-50 cursor-not-allowed"
     : "";
+  const startDisabled = pauseDisabled;
+  const resetDisabled = pauseDisabled;
 
   const hasCurrentSession =
     device.current_session && device.current_session.events.length > 0;
@@ -210,13 +232,29 @@ function createDeviceCard(device) {
                 ).join("")}
               </div>
             </div>
-            <button
-              onclick="togglePause('${device.device_id}')"
-              class="pause-btn bg-amber-500 hover:bg-amber-400 text-gray-900 ${pauseDisabled} font-medium py-1.5 px-4 rounded-lg text-sm transition-colors"
-              ${isOffline ? "disabled" : ""}
-            >
-              Pause
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                onclick="handleStart('${device.device_id}')"
+                class="start-btn bg-emerald-500 hover:bg-emerald-400 text-gray-900 ${startDisabled} font-medium py-1.5 px-3 rounded-lg text-sm transition-colors"
+                ${isOffline ? "disabled" : ""}
+              >
+                Start
+              </button>
+              <button
+                onclick="togglePause('${device.device_id}')"
+                class="pause-btn bg-amber-500 hover:bg-amber-400 text-gray-900 ${pauseDisabled} font-medium py-1.5 px-4 rounded-lg text-sm transition-colors"
+                ${isOffline ? "disabled" : ""}
+              >
+                Pause
+              </button>
+              <button
+                onclick="handleReset('${device.device_id}')"
+                class="reset-btn bg-rose-600 hover:bg-rose-500 text-gray-50 ${resetDisabled} font-medium py-1.5 px-3 rounded-lg text-sm transition-colors"
+                ${isOffline ? "disabled" : ""}
+              >
+                Reset
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -248,6 +286,22 @@ function updateDeviceCard(card, device) {
   } else {
     pauseBtn.className =
       "pause-btn bg-amber-500 hover:bg-amber-400 text-gray-900 font-medium py-1.5 px-4 rounded-lg text-sm transition-colors";
+  }
+
+  const startBtn = card.querySelector(".start-btn");
+  if (startBtn) {
+    startBtn.disabled = isOffline;
+    startBtn.className = isOffline
+      ? "start-btn bg-gray-600 opacity-50 cursor-not-allowed font-medium py-1.5 px-3 rounded-lg text-sm transition-colors"
+      : "start-btn bg-emerald-500 hover:bg-emerald-400 text-gray-900 font-medium py-1.5 px-3 rounded-lg text-sm transition-colors";
+  }
+
+  const resetBtn = card.querySelector(".reset-btn");
+  if (resetBtn) {
+    resetBtn.disabled = isOffline;
+    resetBtn.className = isOffline
+      ? "reset-btn bg-gray-700 opacity-60 cursor-not-allowed text-gray-300 font-medium py-1.5 px-3 rounded-lg text-sm transition-colors"
+      : "reset-btn bg-rose-600 hover:bg-rose-500 text-gray-50 font-medium py-1.5 px-3 rounded-lg text-sm transition-colors";
   }
 
   const levelBtns = card.querySelectorAll(".level-btn");

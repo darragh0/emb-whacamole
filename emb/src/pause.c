@@ -70,6 +70,12 @@ void UART_Handler(void) {
              * Since pause_task has highest priority (4), it will preempt current task.
              */
             xTaskNotifyFromISR(pause_task_handle, 0, eNoAction, &woken);
+        } else if (c == 'R') {
+            const cmd_msg_t cmd = {.type = CMD_RESET};
+            xQueueSendFromISR(cmd_queue, &cmd, &woken);
+        } else if (c == 'S') {
+            const cmd_msg_t cmd = {.type = CMD_START};
+            xQueueSendFromISR(cmd_queue, &cmd, &woken);
         } else if (c >= '1' && c <= '8') {
             // Forward level set command to game task via cmd_queue
             const cmd_msg_t cmd = {
