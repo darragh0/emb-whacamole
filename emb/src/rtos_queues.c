@@ -47,7 +47,11 @@ int8_t rtos_queues_init(void) {
     if (!event_queue) return -1;  // RTOS_QUEUES_ERROR
 
     cmd_queue = xQueueCreate(CMD_QUEUE_LENGTH, sizeof(cmd_msg_t));
-    if (!cmd_queue) return -1;
+    if (!cmd_queue) {
+        vQueueDelete(event_queue);  // Free event_queue to avoid leaking heap
+        event_queue = NULL;
+        return -1;
+    }
 
     return 0;  // RTOS_QUEUES_OK
 }

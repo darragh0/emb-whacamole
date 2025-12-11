@@ -203,8 +203,8 @@ function createDeviceCard(device) {
   return `
     <div class="bg-gray-850 rounded-xl shadow-xl overflow-hidden border border-gray-800 ${cardClass}" data-device="${device.device_id}">
       <div class="px-5 py-4 bg-gray-800/50">
-        <div class="flex justify-between items-center">
-          <div>
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div class="min-w-[200px]">
             <div class="flex items-center gap-2 mb-1">
               <span class="status-dot w-2 h-2 rounded-full ${statusConfig.dot}"></span>
               <h2 class="font-semibold text-lg text-white">${device.device_id}</h2>
@@ -214,11 +214,11 @@ function createDeviceCard(device) {
               ${device.status !== "online" && device.last_seen ? `<span class="text-gray-600 text-xs">${formatRelativeTime(device.last_seen)}</span>` : ""}
             </div>
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex flex-col gap-2 w-full lg:w-auto">
             <span class="game-badge">${getGameStateBadge(device)}</span>
-            <div class="flex items-center gap-2 level-control">
+            <div class="flex flex-wrap items-center gap-2 level-control">
               <span class="text-xs text-gray-500">Level</span>
-              <div class="flex gap-1 level-buttons">
+              <div class="flex flex-wrap gap-1 level-buttons">
                 ${LEVELS.map(
                   (lvl) => `
                     <button
@@ -232,7 +232,7 @@ function createDeviceCard(device) {
                 ).join("")}
               </div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
               <button
                 onclick="handleStart('${device.device_id}')"
                 class="start-btn bg-emerald-500 hover:bg-emerald-400 text-gray-900 ${startDisabled} font-medium py-1.5 px-3 rounded-lg text-sm transition-colors"

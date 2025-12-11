@@ -30,6 +30,11 @@ typedef enum {
     CMD_START,
 } cmd_type_t;
 
+typedef struct {
+    cmd_type_t type;
+    uint8_t level;  // 1-8 for CMD_SET_LEVEL (unused for other cmds)
+} cmd_msg_t;
+
 /** @brief Type of event sent from game to agent */
 typedef enum {
     EVENT_SESSION_START,
@@ -63,11 +68,6 @@ typedef struct {
 // Queue handles (extern - defined in rtos_queues.c)
 extern QueueHandle_t event_queue;
 extern QueueHandle_t cmd_queue;
-
-typedef struct {
-    cmd_type_t type;
-    uint8_t level;  // 1-8 for CMD_SET_LEVEL (unused for other cmds)
-} cmd_msg_t;
 
 /**
  * @brief Initialize queues
