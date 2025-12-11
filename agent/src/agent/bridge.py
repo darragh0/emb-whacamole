@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
 
 from paho.mqtt.client import Client, ConnectFlags, DisconnectFlags, MQTTMessage
 from paho.mqtt.enums import CallbackAPIVersion
@@ -56,8 +56,8 @@ class Bridge:
     device_id: str | None
 
     _log: Logger
-    _serial: Serial | None
-    _mqtt: Client | None
+    _serial: Serial
+    _mqtt: Client
 
     def __init__(
         self,
@@ -71,11 +71,11 @@ class Bridge:
         self.mqtt_port = mqtt_port
         self.serial_port = serial_port
         self.baud_rate = baud_rate
-        self.device_id: str | None = None
+        self.device_id: str
 
         self._log = logging.getLogger("Bridge")
-        self._serial: Serial | None = None
-        self._mqtt: Client | None = None
+        self._serial: Serial
+        self._mqtt: Client
 
     ####################################################### Pub ########################################################
 
@@ -130,7 +130,7 @@ class Bridge:
 
         while True:
             try:
-                line_bytes = cast("Serial", self._serial).readline()
+                line_bytes = self._serial.readline()
             except SerialException as e:
                 self._log.error("Serial read error: %s", e)
 
@@ -145,7 +145,7 @@ class Bridge:
                     status = "serial_error"
 
                 self._publish_state(status)
-                cast("Serial", self._serial).close()
+                self._serial.close()
                 return
 
             line = line_bytes.decode(Bridge.BYTES_ENCODING, errors="replace").strip()
@@ -163,8 +163,6 @@ class Bridge:
                 try:
                     self._serial = Serial(self.serial_port, self.baud_rate, timeout=0.1)
                 except SerialException:
-                    if self._serial is not None:
-                        self._serial.close()
                     time.sleep(RECONNECT_RETRY_INTERVAL)
                 else:
                     self._log.info("Reconnected to %s", self.serial_port)
@@ -176,14 +174,14 @@ class Bridge:
     def _request_device_id(self) -> bool:
         """Send identify command and wait for response. Returns True on success."""
         self._log.info("Requesting device ID...")
-        cast("Serial", self._serial).write(b"I")
+        self._serial.write(b"I")
 
         timeout_count = 0
         max_timeout = 100  # 10 seconds at 0.1s timeout
 
         while timeout_count < max_timeout:
             try:
-                line_bytes = cast("Serial", self._serial).readline()
+                line_bytes = self._serial.readline()
                 line = line_bytes.decode(Bridge.BYTES_ENCODING, errors="replace").strip()
 
                 if line.startswith("{"):
@@ -220,14 +218,14 @@ class Bridge:
         event["ts"] = time_now_ms()
         self._log.debug("[bright_white on grey30][Device -> MQTT][/] %s", event)
         topic = self._topic("game_events")
-        cast("Client", self._mqtt).publish(topic, json.dumps(event), qos=1)
+        self._mqtt.publish(topic, json.dumps(event), qos=1)
 
     def _publish_state(self, status: DevStatus) -> None:
         """Publish current device state to MQTT."""
         pload = self._status_payload(status)
         topic = self._topic("state")
         self._log.debug("[bright_white on grey30][Agent -> MQTT][/] %s", pload)
-        cast("Client", self._mqtt).publish(topic, payload=json.dumps(pload), qos=1, retain=True)
+        self._mqtt.publish(topic, payload=json.dumps(pload), qos=1, retain=True)
 
     ####################################################### Sub ########################################################
 
@@ -246,7 +244,7 @@ class Bridge:
             payload_str = repr(byte)
 
         self._log.info("[bright_white on grey30][MQTT -> Device][/] %s (%s)", payload_str, desc)
-        cast("Serial", self._serial).write(byte)
+        self._serial.write(byte)
 
         _ = client, userdata
 
@@ -254,7 +252,7 @@ class Bridge:
 
     def _status_payload(self, status: DevStatus) -> StatusPayload:
         """Return a status payload for bridge state messages."""
-        return {"device_id": cast("str", self.device_id), "ts": time_now_ms(), "status": status}
+        return {"device_id": self.device_id, "ts": time_now_ms(), "status": status}
 
     def _topic(self, topic: Bridge.Topic) -> str:
         """Return a MQTT topic string for a given topic type.
