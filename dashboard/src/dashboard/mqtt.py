@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 import socket
 from typing import TYPE_CHECKING, Any, Final
@@ -12,8 +11,6 @@ from paho.mqtt.client import Client, ConnectFlags
 from paho.mqtt.enums import CallbackAPIVersion
 
 from .env import get_env_vars
-
-_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -29,7 +26,7 @@ BROKER, PORT = get_env_vars()
 
 
 def subscribe(topics: list[str], handler: Callable[[dict[str, Any], str], None]) -> Client:
-    client_id = f"cloud-{socket.gethostname()}-{os.getpid()}"
+    client_id = f"dashboard-{socket.gethostname()}-{os.getpid()}"
     mqttc = Client(client_id=client_id, callback_api_version=CallbackAPIVersion.VERSION2)
 
     def on_connect(

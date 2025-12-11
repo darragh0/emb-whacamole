@@ -8,8 +8,8 @@ from fastapi.staticfiles import StaticFiles
 from paho.mqtt import publish
 from starlette.responses import FileResponse
 
-from cloud.mqtt import BROKER, PORT
-from cloud.state import devices, devices_lock
+from dashboard.mqtt import BROKER, PORT
+from dashboard.state import devices, devices_lock
 
 LVL_MIN: Final = 1
 LVL_MAX: Final = 8
