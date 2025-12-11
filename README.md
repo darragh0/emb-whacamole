@@ -5,32 +5,32 @@ Whac-A-Mole game for Analog Devices' [MAX32655 MCU](https://www.analog.com/en/pr
 ## Architecture
 
 ```
-┌─────────────┐     MQTT      ┌─────────────┐
-│   cloud/    │<------------->│   agent/    │
-│  Dashboard  │               │   Bridge    │
-└─────────────┘               └─────────────┘
+┌──────────────┐     MQTT      ┌─────────────┐
+│  dashboard/  │<------------->│   agent/    │
+│  Dashboard   │               │   Bridge    │
+└──────────────┘               └─────────────┘
                                      ^
                                      ¦ UART
                                      ∨
-                              ┌─────────────┐
-                              │    emb/     │
-                              │   Device    │
-                              └─────────────┘
+                               ┌─────────────┐
+                               │    emb/     │
+                               │   Device    │
+                               └─────────────┘
 ```
 
 ## Components
 
-| Directory | Description                                                                                        |
-| --------- | -------------------------------------------------------------------------------------------------- |
-| `emb/`    | **FreeRTOS firmware** – Runs game loop; sends JSON events over UART; receives b"P" (Pause) command |
-| `agent/`  | **Python UART-MQTT bridge** – Bidirectional relay between device & cloud                           |
-| `cloud/`  | **MQTT backend + web dashboard** – Persists events to JSONL; sends commands to device              |
+| Directory    | Description                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------- |
+| `emb/`       | **FreeRTOS firmware** – Runs game loop; sends JSON events over UART; receives b"P" (Pause) command |
+| `agent/`     | **Python UART-MQTT bridge** – Bidirectional relay between device & dashboard                       |
+| `dashboard/` | **MQTT backend + web dashboard** – Persists events to JSONL; sends commands to device              |
 
 ## Installation
 
-### Agent/Cloud
+### Agent/Dashboard
 
-Follow these steps to install agent or cloud locally:
+Follow these steps to install agent or dashboard locally:
 
 #### Requirements
 
@@ -49,7 +49,7 @@ python3 -m venv venv
 . venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install .        # or `pip install -e .` for development
 
-# Now you should be able to run `cloud/agent` directly
+# Now you should be able to run `dashboard/agent` directly
 ```
 
 #### Configuration

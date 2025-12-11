@@ -9,7 +9,7 @@ PORT_MAX: Final = 65535
 
 
 def _setup_err(msg: str, exit_code: int = 1) -> NoReturn:
-    print(f"\x1b[1;91mcloud: setup-error:\x1b[0m {msg}", file=sys.stderr)
+    print(f"\x1b[1;91mdashboard: setup-error:\x1b[0m {msg}", file=sys.stderr)
     sys.exit(exit_code)
 
 
