@@ -43,6 +43,6 @@ int8_t rtos_queues_init(void) {
     // xQueueCreate() allocates queue storage from FreeRTOS heap
     // Returns NULL if insufficient heap memory available
     event_queue = xQueueCreate(EVENT_QUEUE_LENGTH, sizeof(game_event_t));
-    if (!event_queue) return RTOS_QUEUES_ERROR;
-    return RTOS_QUEUES_OK;
+    if (!event_queue) return -1;  // RTOS_QUEUES_ERROR
+    return 0;  // RTOS_QUEUES_OK
 }

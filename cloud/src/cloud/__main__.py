@@ -4,40 +4,18 @@ from __future__ import annotations
 
 import threading
 import time
-from dataclasses import dataclass, field
-from typing import Any, Final, Literal
+from typing import Any
 
 import uvicorn
 
 from cloud.mqtt import subscribe
-
-MAX_PAST_SESSIONS: Final = 5
-
-
-@dataclass
-class Session:
-    """Tracks a game session."""
-
-    events: list[dict[str, Any]] = field(default_factory=list)
-    started_at: int = 0
-    ended_at: int = 0
-    won: bool | None = None
-
-
-@dataclass
-class DeviceState:
-    """Tracks state of a device."""
-
-    device_id: str
-    status: Literal["online", "serial_error", "offline"] = "online"
-    game_state: Literal["playing", "idle"] = "idle"
-    last_seen: int = 0
-    current_session: Session | None = None
-    past_sessions: list[Session] = field(default_factory=list)
-
-
-devices: dict[str, DeviceState] = {}
-devices_lock = threading.Lock()
+from cloud.state import (
+    MAX_PAST_SESSIONS,
+    DeviceState,
+    Session,
+    devices,
+    devices_lock,
+)
 
 
 def handle_message(data: dict[str, Any], topic: str) -> None:
@@ -112,4 +90,8 @@ def main() -> None:
     client = subscribe(topics, handle_message)
     threading.Thread(target=client.loop_forever, daemon=True).start()
 
-    uvicorn.run("cloud.app:app", host="0.0.0.0", port=8000)  # noqa: S104
+    uvicorn.run("cloud.app:app", host="0.0.0.0", port=8001)  # noqa: S104
+
+
+if __name__ == "__main__":
+    main()
