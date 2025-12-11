@@ -1,6 +1,11 @@
 const REFRESH_INTERVAL = 500;
 
 const knownDevices = new Map();
+const LEVELS = Array.from({ length: 8 }, (_, idx) => idx + 1);
+const LEVEL_BTN_ENABLED =
+  "level-btn bg-sky-600 hover:bg-sky-500 text-gray-50 font-medium px-2.5 py-1 rounded-md text-sm transition-colors";
+const LEVEL_BTN_DISABLED =
+  "level-btn bg-gray-700 opacity-60 cursor-not-allowed text-gray-300 font-medium px-2.5 py-1 rounded-md text-sm";
 
 async function fetchDevices() {
   const res = await fetch("/devices");
@@ -9,6 +14,37 @@ async function fetchDevices() {
 
 async function togglePause(deviceId) {
   await fetch(`/command/${encodeURIComponent(deviceId)}`, { method: "POST" });
+}
+
+async function sendReset(deviceId) {
+  await fetch(`/command/${encodeURIComponent(deviceId)}/reset`, {
+    method: "POST",
+  });
+}
+
+async function sendStart(deviceId) {
+  await fetch(`/command/${encodeURIComponent(deviceId)}/start`, {
+    method: "POST",
+  });
+}
+
+async function sendLevel(deviceId, level) {
+  await fetch(`/command/${encodeURIComponent(deviceId)}/level/${level}`, {
+    method: "POST",
+  });
+}
+
+function handleLevelButtonClick(deviceId, level) {
+  if (!Number.isInteger(level) || level < 1 || level > 8) return;
+  sendLevel(deviceId, level);
+}
+
+function handleReset(deviceId) {
+  sendReset(deviceId);
+}
+
+function handleStart(deviceId) {
+  sendStart(deviceId);
 }
 
 function formatRelativeTime(ms) {
@@ -155,6 +191,8 @@ function createDeviceCard(device) {
   const pauseDisabled = isOffline
     ? "disabled opacity-50 cursor-not-allowed"
     : "";
+  const startDisabled = pauseDisabled;
+  const resetDisabled = pauseDisabled;
 
   const hasCurrentSession =
     device.current_session && device.current_session.events.length > 0;
@@ -165,8 +203,8 @@ function createDeviceCard(device) {
   return `
     <div class="bg-gray-850 rounded-xl shadow-xl overflow-hidden border border-gray-800 ${cardClass}" data-device="${device.device_id}">
       <div class="px-5 py-4 bg-gray-800/50">
-        <div class="flex justify-between items-center">
-          <div>
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div class="min-w-[200px]">
             <div class="flex items-center gap-2 mb-1">
               <span class="status-dot w-2 h-2 rounded-full ${statusConfig.dot}"></span>
               <h2 class="font-semibold text-lg text-white">${device.device_id}</h2>
@@ -176,15 +214,47 @@ function createDeviceCard(device) {
               ${device.status !== "online" && device.last_seen ? `<span class="text-gray-600 text-xs">${formatRelativeTime(device.last_seen)}</span>` : ""}
             </div>
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex flex-col gap-2 w-full lg:w-auto">
             <span class="game-badge">${getGameStateBadge(device)}</span>
-            <button
-              onclick="togglePause('${device.device_id}')"
-              class="pause-btn bg-amber-500 hover:bg-amber-400 text-gray-900 ${pauseDisabled} font-medium py-1.5 px-4 rounded-lg text-sm transition-colors"
-              ${isOffline ? "disabled" : ""}
-            >
-              Pause
-            </button>
+            <div class="flex flex-wrap items-center gap-2 level-control">
+              <span class="text-xs text-gray-500">Level</span>
+              <div class="flex flex-wrap gap-1 level-buttons">
+                ${LEVELS.map(
+                  (lvl) => `
+                    <button
+                      onclick="handleLevelButtonClick('${device.device_id}', ${lvl})"
+                      class="${isOffline ? LEVEL_BTN_DISABLED : LEVEL_BTN_ENABLED}"
+                      ${isOffline ? "disabled" : ""}
+                    >
+                      ${lvl}
+                    </button>
+                  `,
+                ).join("")}
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                onclick="handleStart('${device.device_id}')"
+                class="start-btn bg-emerald-500 hover:bg-emerald-400 text-gray-900 ${startDisabled} font-medium py-1.5 px-3 rounded-lg text-sm transition-colors"
+                ${isOffline ? "disabled" : ""}
+              >
+                Start
+              </button>
+              <button
+                onclick="togglePause('${device.device_id}')"
+                class="pause-btn bg-amber-500 hover:bg-amber-400 text-gray-900 ${pauseDisabled} font-medium py-1.5 px-4 rounded-lg text-sm transition-colors"
+                ${isOffline ? "disabled" : ""}
+              >
+                Pause
+              </button>
+              <button
+                onclick="handleReset('${device.device_id}')"
+                class="reset-btn bg-rose-600 hover:bg-rose-500 text-gray-50 ${resetDisabled} font-medium py-1.5 px-3 rounded-lg text-sm transition-colors"
+                ${isOffline ? "disabled" : ""}
+              >
+                Reset
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -217,6 +287,28 @@ function updateDeviceCard(card, device) {
     pauseBtn.className =
       "pause-btn bg-amber-500 hover:bg-amber-400 text-gray-900 font-medium py-1.5 px-4 rounded-lg text-sm transition-colors";
   }
+
+  const startBtn = card.querySelector(".start-btn");
+  if (startBtn) {
+    startBtn.disabled = isOffline;
+    startBtn.className = isOffline
+      ? "start-btn bg-gray-600 opacity-50 cursor-not-allowed font-medium py-1.5 px-3 rounded-lg text-sm transition-colors"
+      : "start-btn bg-emerald-500 hover:bg-emerald-400 text-gray-900 font-medium py-1.5 px-3 rounded-lg text-sm transition-colors";
+  }
+
+  const resetBtn = card.querySelector(".reset-btn");
+  if (resetBtn) {
+    resetBtn.disabled = isOffline;
+    resetBtn.className = isOffline
+      ? "reset-btn bg-gray-700 opacity-60 cursor-not-allowed text-gray-300 font-medium py-1.5 px-3 rounded-lg text-sm transition-colors"
+      : "reset-btn bg-rose-600 hover:bg-rose-500 text-gray-50 font-medium py-1.5 px-3 rounded-lg text-sm transition-colors";
+  }
+
+  const levelBtns = card.querySelectorAll(".level-btn");
+  levelBtns.forEach((btn) => {
+    btn.disabled = isOffline;
+    btn.className = isOffline ? LEVEL_BTN_DISABLED : LEVEL_BTN_ENABLED;
+  });
 
   if (isOffline) {
     card.classList.add("card-offline");

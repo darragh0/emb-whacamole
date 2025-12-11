@@ -20,6 +20,7 @@
  * NULL until initialized by rtos_queues_init()
  */
 QueueHandle_t event_queue = NULL;
+QueueHandle_t cmd_queue = NULL;
 
 /**
  * @brief Initialize FreeRTOS queues for the application
@@ -44,5 +45,13 @@ int8_t rtos_queues_init(void) {
     // Returns NULL if insufficient heap memory available
     event_queue = xQueueCreate(EVENT_QUEUE_LENGTH, sizeof(game_event_t));
     if (!event_queue) return -1;  // RTOS_QUEUES_ERROR
+
+    cmd_queue = xQueueCreate(CMD_QUEUE_LENGTH, sizeof(cmd_msg_t));
+    if (!cmd_queue) {
+        vQueueDelete(event_queue);  // Free event_queue to avoid leaking heap
+        event_queue = NULL;
+        return -1;
+    }
+
     return 0;  // RTOS_QUEUES_OK
 }

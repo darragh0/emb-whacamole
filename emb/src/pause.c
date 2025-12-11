@@ -17,6 +17,7 @@
 #include "board.h"
 #include "nvic_table.h"
 #include "portmacro.h"
+#include "rtos_queues.h"
 #include "uart.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -44,6 +45,7 @@ static bool paused = false;             // Current pause state
  */
 void UART_Handler(void) {
     mxc_uart_regs_t* uart = MXC_UART_GET_UART(CONSOLE_UART);
+    BaseType_t woken = pdFALSE;  // Track if higher-priority task should run after ISR
 
     // Clear interrupt flags to prevent re-triggering
     uint32_t flags = MXC_UART_GetFlags(uart);
@@ -55,8 +57,6 @@ void UART_Handler(void) {
 
         // 'P' command toggles pause state
         if (c == 'P') {
-            BaseType_t woken = pdFALSE;  // OUT: Set to pdTRUE if task should yield
-
             /**
              * xTaskNotifyFromISR() - Wake pause_task immediately
              *
@@ -70,17 +70,31 @@ void UART_Handler(void) {
              * Since pause_task has highest priority (4), it will preempt current task.
              */
             xTaskNotifyFromISR(pause_task_handle, 0, eNoAction, &woken);
-
-            /**
-             * portYIELD_FROM_ISR() - Trigger context switch if needed
-             *
-             * If woken == pdTRUE, a higher priority task is now ready.
-             * This macro requests immediate context switch after ISR returns.
-             * Without this, the task switch would be delayed until next tick.
-             */
-            portYIELD_FROM_ISR(woken);
+        } else if (c == 'R') {
+            const cmd_msg_t cmd = {.type = CMD_RESET};
+            xQueueSendFromISR(cmd_queue, &cmd, &woken);
+        } else if (c == 'S') {
+            const cmd_msg_t cmd = {.type = CMD_START};
+            xQueueSendFromISR(cmd_queue, &cmd, &woken);
+        } else if (c >= '1' && c <= '8') {
+            // Forward level set command to game task via cmd_queue
+            const cmd_msg_t cmd = {
+                .type = CMD_SET_LEVEL,
+                .level = (uint8_t)(c - '0'),
+            };
+            // Best-effort: if queue is full we drop the command (game drains frequently)
+            xQueueSendFromISR(cmd_queue, &cmd, &woken);
         }
     }
+
+    /**
+     * portYIELD_FROM_ISR() - Trigger context switch if needed
+     *
+     * If woken == pdTRUE, a higher priority task is now ready.
+     * This macro requests immediate context switch after ISR returns.
+     * Without this, the task switch would be delayed until next tick.
+     */
+    portYIELD_FROM_ISR(woken);
 }
 
 /**
