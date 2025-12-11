@@ -1,7 +1,7 @@
 [project]
 name = "cloud"
 version = "0.1.0"
-description = "MQTT backend + dashboard for Whacamole game"
+description = "MQTT backend + dashboard for Whackamole game"
 readme = "README.md"
 license-file = "../LICENSE"
 authors = [{ name = "darragh0" }, { name = "jjola00" }, { name = "tomjoyce1" }]
