@@ -1,21 +1,20 @@
-"""Dashboard API."""
-
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any, Final
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from paho.mqtt import publish
 from starlette.responses import FileResponse
 
-from dashboard.mqtt import BROKER, PORT
-from dashboard.state import devices, devices_lock
+from dashboard.mqtt import pub_cmd
+from dashboard.state import DEV_LOCK, devices
+from dashboard.types import StatusOk
 
 LVL_MIN: Final = 1
 LVL_MAX: Final = 8
 
 app: Final = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=Path(__file__).parents[2] / "static"), name="static")
 
 
 @app.get("/")
@@ -25,58 +24,28 @@ async def dashboard() -> FileResponse:
 
 @app.get("/devices")
 async def get_devices() -> list[dict[str, Any]]:
-    with devices_lock:
+    with DEV_LOCK:
         return [asdict(dev) for dev in devices.values()]
 
 
 @app.post("/command/{device_id}/pause")
-async def post_pause_command(device_id: str) -> dict[str, bool]:
-    publish.single(
-        f"whac/{device_id}/commands",
-        "P",
-        hostname=BROKER,
-        port=PORT,
-        qos=2,
-    )
-    return {"ok": True}
+async def post_pause_command(device_id: str) -> StatusOk:
+    return pub_cmd(device_id, "P")
 
 
 @app.post("/command/{device_id}/reset")
-async def post_reset_command(device_id: str) -> dict[str, bool]:
-    publish.single(
-        f"whac/{device_id}/commands",
-        "R",
-        hostname=BROKER,
-        port=PORT,
-        qos=2,
-    )
-    return {"ok": True}
+async def post_reset_command(device_id: str) -> StatusOk:
+    return pub_cmd(device_id, "R")
 
 
 @app.post("/command/{device_id}/start")
-async def post_start_command(device_id: str) -> dict[str, bool]:
-    publish.single(
-        f"whac/{device_id}/commands",
-        "S",
-        hostname=BROKER,
-        port=PORT,
-        qos=2,
-    )
-
-    return {"ok": True}
+async def post_start_command(device_id: str) -> StatusOk:
+    return pub_cmd(device_id, "S")
 
 
 @app.post("/command/{device_id}/level/{level}")
-async def post_level_command(device_id: str, level: int) -> dict[str, bool]:
+async def post_level_command(device_id: str, level: int) -> StatusOk:
     if level < LVL_MIN or level > LVL_MAX:
         raise HTTPException(status_code=400, detail="Level must be between 1 and 8")
 
-    publish.single(
-        f"whac/{device_id}/commands",
-        str(level),
-        hostname=BROKER,
-        port=PORT,
-        qos=2,
-    )
-
-    return {"ok": True}
+    return pub_cmd(device_id, str(level))

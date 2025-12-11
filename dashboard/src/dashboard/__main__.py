@@ -1,25 +1,24 @@
 """Cloud backend entry point."""
 
-from __future__ import annotations
-
 import threading
 import time
-from typing import Any
+from typing import Any, Final
 
 import uvicorn
 from paho.mqtt import publish
 
-from dashboard.mqtt import BROKER, PORT, subscribe
-from dashboard.state import (
+from .env import APP_PORT, BROKER, MQTT_PORT
+from .mqtt import subscribe
+from .state import (
+    DEV_LOCK,
     MAX_PAST_SESSIONS,
     DeviceState,
     Session,
     devices,
-    devices_lock,
 )
 
-DEVICE_TIMEOUT_MS = 30_000  # 30 seconds - mark offline if no message received
-TIMEOUT_CHECK_INTERVAL = 5  # seconds between timeout checks
+DEVICE_TIMEOUT_MS: Final = 30_000  # 30 seconds - mark offline if no message received
+TIMEOUT_CHECK_INTERVAL: Final = 5  # seconds between timeout checks
 
 
 def handle_message(data: dict[str, Any], topic: str) -> None:
@@ -39,7 +38,7 @@ def handle_state(data: dict[str, Any]) -> None:
     status = data.get("status")
     ts = data.get("ts", int(time.time() * 1000))
 
-    with devices_lock:
+    with DEV_LOCK:
         if device_id not in devices:
             devices[device_id] = DeviceState(device_id=device_id, last_seen=ts)
 
@@ -62,7 +61,7 @@ def handle_game_event(data: dict[str, Any]) -> None:
     if not device_id:
         return
 
-    with devices_lock:
+    with DEV_LOCK:
         if device_id not in devices:
             devices[device_id] = DeviceState(device_id=device_id)
 
@@ -92,7 +91,7 @@ def check_device_timeouts() -> None:
     while True:
         time.sleep(TIMEOUT_CHECK_INTERVAL)
         now = int(time.time() * 1000)
-        with devices_lock:
+        with DEV_LOCK:
             for device in devices.values():
                 if device.status == "online" and (now - device.last_seen) > DEVICE_TIMEOUT_MS:
                     device.status = "offline"
@@ -106,8 +105,8 @@ def main() -> None:
     threading.Thread(target=check_device_timeouts, daemon=True).start()
 
     print("[MQTT] Broadcasting heartbeat to all devices")
-    publish.single("whac/all/commands", "H", hostname=BROKER, port=PORT, qos=2)
-    uvicorn.run("dashboard.app:app", host="0.0.0.0", port=8000)  # noqa: S104
+    publish.single("whac/all/commands", "H", hostname=BROKER, port=MQTT_PORT, qos=2)
+    uvicorn.run("dashboard.app:app", host="0.0.0.0", port=APP_PORT)  # noqa: S104
 
 
 if __name__ == "__main__":
