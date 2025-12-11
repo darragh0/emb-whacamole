@@ -3,8 +3,8 @@
  * FreeRTOS queues for inter-task communication
  *
  * Two queues:
- * - event_queue:  Game task  -> Agent task (game events to send to cloud)
- * - cmd_queue:    Agent task -> Game task (commands from cloud, e.g. pause)
+ * - event_queue:  Game task  -> Agent task (game events to send to dashboard)
+ * - cmd_queue:    Agent task -> Game task (commands from dashboard, e.g. pause)
  */
 
 #pragma once
@@ -23,7 +23,7 @@
 #define RTOS_QUEUES_OK 0
 #define RTOS_QUEUES_ERR -1
 
-/** @brief Commands coming from cloud */
+/** @brief Commands coming from dashboard */
 typedef enum {
     CMD_SET_LEVEL = 0,
     CMD_RESET,

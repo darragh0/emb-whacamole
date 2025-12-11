@@ -40,7 +40,7 @@ volatile bool identify_requested = false;
  * UART Buffering:
  * printf() writes to UART TX buffer, fflush() ensures data is transmitted
  * immediately rather than waiting for buffer to fill. This reduces latency
- * for event delivery to the cloud.
+ * for event delivery to the dashboard.
  *
  * @param event Pointer to game event structure (copied from queue)
  */

@@ -23,7 +23,7 @@
  *
  * Queue Producer Pattern:
  * game_task generates events and sends to event_queue via xQueueSend().
- * Events are consumed by agent_task and sent to cloud via UART.
+ * Events are consumed by agent_task and sent to dashboard via UART.
  */
 
 #include "game.h"
@@ -37,10 +37,10 @@
 // Game state variables
 static uint8_t lives;       // Remaining lives (max 5)
 static uint32_t rng_state;  // Xorshift RNG state for random numbers
-static uint8_t requested_level_idx = 0;  // Latest level request (0-based, 1-8 from cloud)
+static uint8_t requested_level_idx = 0;  // Latest level request (0-based, 1-8 from dashboard)
 static bool level_change_pending = false;  // New level command received
 static bool reset_requested = false;       // Reset request pending
-static bool start_requested = false;       // Start request pending (from cloud)
+static bool start_requested = false;       // Start request pending (from dashboard)
 static bool reset_abort_session = false;   // Track if reset stopped an in-progress session
 
 // Game difficulty configuration
@@ -349,7 +349,7 @@ static pop_outcome_t pop_do(
          * - No busy-waiting means efficient CPU usage
          *
          * During this delay, agent_task can drain event queue and send UART,
-         * ensuring game events are transmitted to cloud without blocking game logic.
+         * ensuring game events are transmitted to dashboard without blocking game logic.
          */
         MS_SLEEP(poll_interval);  // vTaskDelay(5) - Block for 5ms
         elapsed += poll_interval;  // Track total reaction time
@@ -366,7 +366,7 @@ static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
     lvl_show(lvl_idx);
 
     for (int pop = 0; pop < pops; pop++) {
-        drain_cmd_queue();  // Keep up with cloud commands while playing
+        drain_cmd_queue();  // Keep up with dashboard commands while playing
         if (reset_requested) {
             apply_reset_state(true);
             return;
@@ -410,7 +410,7 @@ int await_start(void) {
     uint8_t btn_state = BTN_HW_STATE;
 restart_idle:
     while (true) {
-        drain_cmd_queue();  // Allow cloud level updates while idle
+        drain_cmd_queue();  // Allow dashboard level updates while idle
         if (reset_requested) {
             apply_reset_state(false);
             continue;  // Stay idle
