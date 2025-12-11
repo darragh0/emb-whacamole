@@ -1,5 +1,3 @@
-"""UART-to-MQTT bridge for embedded device communication."""
-
 from __future__ import annotations
 
 import json
@@ -13,6 +11,8 @@ from paho.mqtt.enums import CallbackAPIVersion
 from rich.status import Status
 from serial import Serial, SerialException
 from serial.tools import list_ports
+
+from agent.logging_conf import RichStyleHandler
 
 from .utils import time_now_ms
 
@@ -86,14 +86,14 @@ class Bridge:
         """Connect to MQTT and UART, then process events."""
 
         # Connect to serial
-        self._log.info("Connecting to [yellow]%s[/] (%d baud)", self.serial_port, self.baud_rate)
+        self._log.info("Connecting to serial port %s (%d baud)", self.serial_port, self.baud_rate)
         try:
             self._serial = Serial(self.serial_port, self.baud_rate, timeout=0.1)
         except SerialException as e:
             self._log.error("Failed to connect to serial port: %s", e)
             return
 
-        self._log.info("Connected to [yellow]%s[/]", self.serial_port)
+        self._log.info("Connected to %s", self.serial_port)
 
         if not self._request_device_id():
             self._log.error("Failed to get device ID from device")
@@ -115,7 +115,7 @@ class Bridge:
         topic = self._topic("state")
         self._mqtt.will_set(topic, payload=json.dumps(pload), qos=1, retain=True)
 
-        self._log.info("Connecting to MQTT broker %s:%d", self.mqtt_broker, self.mqtt_port)
+        self._log.info("Connecting to MQTT broker [bright_magenta]%s:%d[/]", self.mqtt_broker, self.mqtt_port)
         self._mqtt.connect_async(self.mqtt_broker, self.mqtt_port, keepalive=30)
         self._mqtt.loop_start()
 
@@ -126,6 +126,11 @@ class Bridge:
         finally:
             self._mqtt.loop_stop()
             self._serial.close()
+            # Just for logging purposes
+            # ---
+            pload = self._status_payload("offline")
+            self._log.debug("[bright_white on grey30][Agent -> MQTT][/] %s", pload)
+            # ---
             self._log.info("Shutdown complete")
 
     def _read_events(self) -> None:
@@ -174,6 +179,7 @@ class Bridge:
                 except SerialException:
                     time.sleep(RECONNECT_RETRY_INTERVAL)
                 else:
+                    status.stop()
                     self._log.info("Reconnected to %s", self.serial_port)
                     return True
 
@@ -197,22 +203,29 @@ class Bridge:
                     line = line_bytes.decode(Bridge.BYTES_ENCODING, errors="replace").strip()
 
                 except SerialException as e:
+                    status.stop()
                     self._log.error("Serial error while getting device ID: %s", e)
                     return False
 
                 except UnicodeDecodeError as e:
-                    self._log.error("Decode error (%s) while getting device ID: %s", Bridge.BYTES_ENCODING, e)
-                    continue
+                    fmted = RichStyleHandler.fmt_msg(
+                        f"Decode error ({Bridge.BYTES_ENCODING}) while getting device ID: {e}",
+                        logging.WARNING,
+                    )
+                    status.console.log(fmted)
 
-                if line.startswith("{"):
-                    try:
-                        event = json.loads(line)
-                        if event.get("event_type") == "identify" and "device_id" in event:
-                            self.device_id = event["device_id"]
-                            self._log.info("Device ID: %s", self.device_id)
-                            return True
-                    except JSONDecodeError as e:
-                        self._log.warning("Invalid JSON: %s (error: %s)", line, e)
+                else:
+                    if line.startswith("{"):
+                        try:
+                            event = json.loads(line)
+                            if event.get("event_type") == "identify" and "device_id" in event:
+                                self.device_id = event["device_id"]
+                                status.stop()
+                                self._log.info("Device ID: %s", self.device_id)
+                                return True
+                        except JSONDecodeError as e:
+                            fmted = RichStyleHandler.fmt_msg(f"Invalid JSON: {line} (error: {e})", logging.ERROR)
+                            status.console.log(fmted)
 
                 time.sleep(DEVICE_ID_RETRY_INTERVAL)
 
@@ -295,7 +308,7 @@ class Bridge:
         """Handle MQTT connection."""
 
         if not reason_code.is_failure:
-            self._log.info("Connected to MQTT %s:%d", self.mqtt_broker, self.mqtt_port)
+            self._log.info("Connected to [bright_magenta]%s:%d[/]", self.mqtt_broker, self.mqtt_port)
             topic = self._topic("commands")
             client.subscribe(topic, qos=1)
             return
