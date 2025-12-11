@@ -37,6 +37,8 @@
 // Game state variables
 static uint8_t lives;       // Remaining lives (max 5)
 static uint32_t rng_state;  // Xorshift RNG state for random numbers
+static uint8_t requested_level_idx = 0;  // Latest level request (0-based, 1-8 from cloud)
+static bool level_change_pending = false;  // New level command received
 
 // Game difficulty configuration
 static const uint8_t POPS_PER_LVL[8] = {[0 ... 7] = 10};  // 10 pops per level
@@ -121,6 +123,36 @@ static void emit_session_end(const bool won) {
         .data.session_end.won = won,
     };
     xQueueSend(event_queue, &event, 0);
+}
+
+/** @brief Drain command queue and capture latest requested level */
+static void drain_cmd_queue(void) {
+    if (!cmd_queue) return;
+
+    cmd_msg_t cmd;
+    while (xQueueReceive(cmd_queue, &cmd, 0) == pdTRUE) {
+        if (cmd.type == CMD_SET_LEVEL && cmd.level >= 1 && cmd.level <= LVLS) {
+            requested_level_idx = cmd.level - 1;  // Convert to 0-based index
+            level_change_pending = true;          // Apply as soon as scheduler lets us run
+        }
+    }
+}
+
+/** @brief Clamp requested level to valid range */
+static inline uint8_t requested_level_or_default(void) {
+    return (requested_level_idx < LVLS) ? requested_level_idx : 0;
+}
+
+/** @brief Whether a different level has been requested mid-session */
+static inline bool should_switch_level(const uint8_t current_level_idx) {
+    return level_change_pending && requested_level_idx < LVLS
+        && requested_level_idx != current_level_idx;
+}
+
+/** @brief Consume pending level request and return the target */
+static inline uint8_t consume_requested_level(void) {
+    level_change_pending = false;
+    return requested_level_or_default();
 }
 
 /** @brief Flash LEDs for late/miss feedback */
@@ -300,25 +332,27 @@ static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
     lvl_show(lvl_idx);
 
     for (int pop = 0; pop < pops; pop++) {
+        drain_cmd_queue();  // Keep up with cloud commands while playing
+        if (should_switch_level(lvl_idx)) return;  // Jump to requested level ASAP
+
         pop_wait_delay(&rng_state);
+        drain_cmd_queue();  // Capture requests that arrived during the delay
+        if (should_switch_level(lvl_idx)) return;
 
         uint8_t mole;
         uint16_t reaction_ms;
         pop_outcome_t outcome = pop_do(lvl_idx, &rng_state, &mole, &reaction_ms);
 
-        switch (outcome) {
-            case POP_HIT:
-                emit_pop_result(mole, outcome, reaction_ms, lvl_idx, pop + 1, pops);
-                continue;
-            case POP_MISS:
-            case POP_LATE:
-                break;
+        if (outcome == POP_HIT) {
+            emit_pop_result(mole, outcome, reaction_ms, lvl_idx, pop + 1, pops);
+        } else {
+            lives--;
+            emit_pop_result(mole, outcome, reaction_ms, lvl_idx, pop + 1, pops);
+            feedback_late_or_miss();
+            if (lives == 0) return;
         }
 
-        lives--;
-        emit_pop_result(mole, outcome, reaction_ms, lvl_idx, pop + 1, pops);
-        feedback_late_or_miss();
-        if (lives == 0) return;
+        if (should_switch_level(lvl_idx)) return;
     }
 
     emit_level_complete(lvl_idx);
@@ -329,6 +363,7 @@ int await_start(void) {
 
     uint8_t btn_state = BTN_HW_STATE;
     while (true) {
+        drain_cmd_queue();  // Allow cloud level updates while idle
         uint8_t led_pattern = 0;
         for (int i = 0; i < 8; i++) {
             led_on(i, &led_pattern);
@@ -336,6 +371,7 @@ int await_start(void) {
 
             for (int j = 0; j < 50; j++) {
                 MS_SLEEP(10);
+                drain_cmd_queue();
 
                 int err = io_expander_read_btns(&btn_state);
                 if (err != E_SUCCESS) return err;
@@ -356,9 +392,12 @@ success:
 void game_run(void) {
     lives = LIVES;
     rng_state = RNG_INIT_STATE;
+    drain_cmd_queue();  // Capture latest requested start level before beginning
+    uint8_t lvl = requested_level_or_default();  // Start at latest requested level
+    level_change_pending = false;                // We just aligned start level
     emit_session_start();
 
-    for (uint8_t lvl = 0; lvl < LVLS; lvl++) {
+    while (lvl < LVLS) {
         // printf("\nLevel %d  |  %d ms  |  Lives: %d\n", lvl + 1, duration_ms, lives);
         game_run_level(lvl, POPS_PER_LVL[lvl]);
         if (lives == 0) {
@@ -368,6 +407,17 @@ void game_run(void) {
             feedback_game_over();
             return;
         }
+
+        drain_cmd_queue();             // Let queued requests while paused take effect immediately
+        if (level_change_pending) {
+            const uint8_t target_lvl = consume_requested_level();
+            if (target_lvl != lvl) {
+                lvl = target_lvl;
+                continue;  // Jump straight to requested level (no extra delay)
+            }
+        }
+
+        lvl++;
     }
 
     // printf("\nCongratulations! Completed all %d levels with %d lives remaining!\n", LVLS, lives);
@@ -380,8 +430,11 @@ void game_task(void* const param) {
     (void)param;
 
     while (true) {
+        drain_cmd_queue();
         await_start();
+        drain_cmd_queue();
         game_run();
+        drain_cmd_queue();
         MS_SLEEP(2000); // Pause before next game
     }
 }
