@@ -33,7 +33,17 @@ class Bridge:
     type Topic = Literal["state", "commands", "game_events"]
 
     TOPIC_NAMESPACE: ClassVar = "whac"
-    VALID_COMMANDS: ClassVar[dict[bytes, str]] = {b"P": "pause toggle"}
+    VALID_COMMANDS: ClassVar[dict[bytes, str]] = {
+        b"P": "pause toggle",
+        b"1": "set level 1",
+        b"2": "set level 2",
+        b"3": "set level 3",
+        b"4": "set level 4",
+        b"5": "set level 5",
+        b"6": "set level 6",
+        b"7": "set level 7",
+        b"8": "set level 8",
+    }
     BYTES_ENCODING: ClassVar = "ascii"
 
     mqtt_broker: str
@@ -187,7 +197,13 @@ class Bridge:
             self._log.warning('[MQTT -> Device] INVALID COMMAND: "%s"', byte)
             return
 
-        self._log.info("[bright_white on grey30][MQTT -> Device][/] P (%s)", Bridge.VALID_COMMANDS[byte])
+        desc = Bridge.VALID_COMMANDS[byte]
+        try:
+            payload_str = byte.decode(Bridge.BYTES_ENCODING)
+        except UnicodeDecodeError:
+            payload_str = repr(byte)
+
+        self._log.info("[bright_white on grey30][MQTT -> Device][/] %s (%s)", payload_str, desc)
         cast("Serial", self._serial).write(byte)
 
         _ = client, userdata
