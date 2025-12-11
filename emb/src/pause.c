@@ -82,6 +82,7 @@ void UART_Handler(void) {
                 .type = CMD_SET_LEVEL,
                 .level = (uint8_t)(c - '0'),
             };
+            // Best-effort: if queue is full we drop the command (game drains frequently)
             xQueueSendFromISR(cmd_queue, &cmd, &woken);
         }
     }
