@@ -180,7 +180,6 @@ class Bridge:
                 line = line_bytes.decode(Bridge.BYTES_ENCODING, errors="replace").strip()
                 
                 if line.startswith("{"):
-                    self._log.debug("Received JSON line: %s", line)
                     try:
                         event = json.loads(line)
                         if event.get("msg_type") == "device_id" and "device_id" in event:
@@ -188,11 +187,18 @@ class Bridge:
                             self._device_id_received = True
                             self._log.info("Device ID received: %s", self.device_id)
                             return
-                        else:
-                            self._log.debug("Not a device_id message: %s", event)
-                    except json.JSONDecodeError as e:
-                        self._log.debug("JSON decode error: %s", e)
+                        elif "device_id" in event:
+                            # Handle old format for compatibility
+                            self.device_id = event["device_id"]
+                            self._device_id_received = True
+                            self._log.info("Device ID received (old format): %s", self.device_id)
+                            return
+                        # Continue waiting for device_id message
+                    except json.JSONDecodeError:
+                        pass  # Continue waiting
                         
+                elif line:  # Only increment timeout on empty reads
+                    continue
                 timeout_count += 1
             except SerialException as e:
                 self._log.error("Serial error while getting device ID: %s", e)
