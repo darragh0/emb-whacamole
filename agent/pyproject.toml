@@ -1,7 +1,7 @@
 [project]
 name = "agent"
 version = "0.1.0"
-description = "Serial-to-MQTT bridge for Whacamole game"
+description = "Serial-to-MQTT bridge for Whackamole game"
 readme = "README.md"
 license-file = "../LICENSE"
 authors = [{ name = "darragh0" }, { name = "jjola00" }, { name = "tomjoyce1" }]

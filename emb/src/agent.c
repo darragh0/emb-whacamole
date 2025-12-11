@@ -20,7 +20,9 @@
 #include "agent.h"
 #include "rtos_queues.h"
 #include "utils.h"
+#include "mxc_sys.h"
 #include <stdio.h>
+#include <stdbool.h>
 
 // Outcome enum -> string mapping for JSON serialization
 static const char* const OUTCOME_STR[] = {"hit", "miss", "late"};
@@ -39,7 +41,33 @@ static const char* const OUTCOME_STR[] = {"hit", "miss", "late"};
  *
  * @param event Pointer to game event structure (copied from queue)
  */
+
+#define DEVID_LEN 10
+
+const char* get_devid(void) {
+    static char id[DEVID_LEN + 1];
+    static bool initialized = false;
+
+    if (initialized) return id;
+
+    uint8_t usn[MXC_SYS_USN_LEN];
+    if (MXC_SYS_GetUSN(usn, NULL) != E_NO_ERROR) return NULL;
+
+    snprintf(id, sizeof(id), "%02x%02x%02x%02x%02x",
+        usn[MXC_SYS_USN_LEN - 5],
+        usn[MXC_SYS_USN_LEN - 4],
+        usn[MXC_SYS_USN_LEN - 3],
+        usn[MXC_SYS_USN_LEN - 2],
+        usn[MXC_SYS_USN_LEN - 1]);
+
+    initialized = true;
+    return id;
+}
+
 static void send_event_json(const game_event_t* const event) {
+    const char* device_id = get_devid();
+    if (!device_id) return;  // Failed to get device ID
+
     // Serialize event based on type
     switch (event->type) {
         case EVENT_SESSION_START:
@@ -110,6 +138,13 @@ static void send_event_json(const game_event_t* const event) {
  */
 void agent_task(void* const param) {
     (void)param;  // Suppress unused parameter warning
+
+    // Send device identification on startup
+    const char* device_id = get_devid();
+    if (device_id) {
+        printf("{\"msg_type\":\"device_id\",\"device_id\":\"%s\"}\n", device_id);
+        fflush(stdout);
+    }
 
     game_event_t event;  // Stack-allocated event buffer for queue copy
 

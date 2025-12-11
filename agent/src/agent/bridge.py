@@ -71,6 +71,8 @@ class Bridge:
         self.mqtt_port = mqtt_port
         self.serial_port = serial_port
         self.baud_rate = baud_rate
+        self._device_id_received = False
+        # fallback
         self.device_id = device_id
 
         self._log = logging.getLogger("Bridge")
@@ -87,7 +89,19 @@ class Bridge:
     def run(self) -> None:
         """Connect to MQTT and UART, then process events."""
 
-        # Set Last Will - broker publishes this if agent disconnects unexpectedly
+        # Connect to serial first to get device ID
+        self._log.info("Connecting to %s (%d baud)", self.serial_port, self.baud_rate)
+        try:
+            self._serial = Serial(self.serial_port, self.baud_rate, timeout=0.1)
+        except SerialException as e:
+            self._log.error("Failed to connect to serial port: %s", e)
+            return
+
+        self._log.info("Connected to %s", self.serial_port)
+        
+        # Get device ID from first message
+        self._get_device_id_from_serial()
+        
         pload = self._payload(status="offline")
         topic = self._topic("state")
         self._mqtt.will_set(topic, payload=json.dumps(pload), qos=1, retain=True)
@@ -95,16 +109,7 @@ class Bridge:
         self._log.info("Connecting to MQTT broker %s:%d", self.mqtt_broker, self.mqtt_port)
         self._mqtt.connect_async(self.mqtt_broker, self.mqtt_port, keepalive=30)
         self._mqtt.loop_start()
-
-        self._log.info("Connecting to %s (%d baud)", self.serial_port, self.baud_rate)
-        try:
-            self._serial = Serial(self.serial_port, self.baud_rate, timeout=0.1)
-        except SerialException as e:
-            self._log.error("Failed to connect to serial port: %s", e)
-            self._mqtt.loop_stop()
-            return
-
-        self._log.info("Connected to %s", self.serial_port)
+        
         self._publish_state("online")
 
         try:
@@ -162,6 +167,40 @@ class Bridge:
         self._log.error("Reconnect timeout after %ds", RECONNECT_TIMEOUT_SECS)
         return False
 
+    def _get_device_id_from_serial(self) -> None:
+        """Wait for first message from device to get hardware ID."""
+        self._log.info("Waiting for device ID from hardware...")
+        
+        timeout_count = 0
+        max_timeout = 100  # 10 seconds at 0.1s timeout - this is the max wait
+        
+        while not self._device_id_received and timeout_count < max_timeout:
+            try:
+                line_bytes = cast("Serial", self._serial).readline()
+                line = line_bytes.decode(Bridge.BYTES_ENCODING, errors="replace").strip()
+                
+                if line.startswith("{"):
+                    self._log.debug("Received JSON line: %s", line)
+                    try:
+                        event = json.loads(line)
+                        if event.get("msg_type") == "device_id" and "device_id" in event:
+                            self.device_id = event["device_id"]
+                            self._device_id_received = True
+                            self._log.info("Device ID received: %s", self.device_id)
+                            return
+                        else:
+                            self._log.debug("Not a device_id message: %s", event)
+                    except json.JSONDecodeError as e:
+                        self._log.debug("JSON decode error: %s", e)
+                        
+                timeout_count += 1
+            except SerialException as e:
+                self._log.error("Serial error while getting device ID: %s", e)
+                break
+        
+        if not self._device_id_received:
+            self._log.warning("Failed to get device ID from hardware, using fallback: %s", self.device_id)
+
     def _process_event(self, jsonl: str) -> None:
         """Process and publish a JSON event from the device."""
 
@@ -169,6 +208,10 @@ class Bridge:
             event = json.loads(jsonl)
         except json.JSONDecodeError as e:
             self._log.warning("Invalid JSON: %s (error: %s)", jsonl, e)
+            return
+
+        # Skip device identification messages
+        if event.get("msg_type") == "device_id":
             return
 
         # Enrich with device_id and timestamp
