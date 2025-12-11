@@ -83,6 +83,7 @@ class Bridge:
         self._log = logging.getLogger("Bridge")
         self._serial: Serial
         self._mqtt: Client
+        self._paused: bool = False
 
     ####################################################### Pub ########################################################
 
@@ -128,6 +129,7 @@ class Bridge:
         try:
             self._read_events()
         finally:
+            self._cleanup_before_disconnect()
             self._mqtt.loop_stop()
             self._serial.close()
             # Just for logging purposes
@@ -158,6 +160,7 @@ class Bridge:
                     status = "serial_error"
 
                 self._publish_state(status)
+                self._cleanup_before_disconnect()
                 self._serial.close()
                 return
 
@@ -199,7 +202,12 @@ class Bridge:
         """Send identify command and wait for response. Returns True on success."""
 
         self._log.info("Requesting device ID")
-        self._serial.write(b"I")  # Identify
+
+        try:
+            self._serial.write(b"I")  # Identify
+        except SerialException as e:
+            self._log.error("Serial error while requesting device ID: %s", e)
+            return False
 
         with Status("") as status:
             start = time.monotonic()
@@ -285,7 +293,15 @@ class Bridge:
 
         desc = Bridge.BOARD_COMMANDS[byte]
         self._log.info("[bright_white on grey30][MQTT -> Device][/] %r (%s)", byte, desc)
-        self._serial.write(byte)
+
+        try:
+            self._serial.write(byte)
+        except SerialException as e:
+            self._log.error("Serial error while sending command: %s", e)
+            return
+
+        if byte == b"P":
+            self._paused = not self._paused
 
         _ = client, userdata
 
@@ -311,6 +327,16 @@ class Bridge:
         """Check if serial device is physically connected."""
         available = [p.device for p in list_ports.comports()]
         return self.serial_port in available
+
+    def _cleanup_before_disconnect(self) -> None:
+        """Send unpause if device is paused before disconnecting."""
+        if self._paused:
+            try:
+                self._log.info("[bright_white on grey30][Agent -> Device][/] Unpausing device before disconnect")
+                self._serial.write(b"P")
+                self._paused = False
+            except SerialException:
+                self._log.error("Failed to unpause device before disconnect")
 
     ############################################### Connection Callbacks ###############################################
 
