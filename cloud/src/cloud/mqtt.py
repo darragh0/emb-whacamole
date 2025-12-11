@@ -46,8 +46,12 @@ def subscribe(topics: list[str], handler: Callable[[dict[str, Any], str], None])
     ) -> None:
         _ = client, userdata, flags, properties
         if not reason_code.is_failure:
+            print(f"[MQTT] Connected to {BROKER}:{PORT}")
             for t in topics:
                 mqttc.subscribe(t)
+                print(f"[MQTT] Subscribed to {t}")
+        else:
+            print(f"[MQTT] Connection failed: {reason_code}")
 
     def on_message(
         client: Client,
@@ -55,9 +59,11 @@ def subscribe(topics: list[str], handler: Callable[[dict[str, Any], str], None])
         message: MQTTMessage,
     ) -> None:
         _ = client, userdata
+        print(f"[MQTT] Received message on {message.topic}")
         handler(json.loads(message.payload.decode()), message.topic)
 
     mqttc.on_connect = on_connect
     mqttc.on_message = on_message
+    print(f"[MQTT] Connecting to {BROKER}:{PORT}...")
     mqttc.connect(BROKER, PORT)
     return mqttc

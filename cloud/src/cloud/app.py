@@ -7,9 +7,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
-from cloud.__main__ import devices, devices_lock
-
-from .mqtt import send_pause
+from cloud.mqtt import send_pause
+from cloud.state import devices, devices_lock
 
 app: Final = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
