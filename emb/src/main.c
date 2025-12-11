@@ -1,9 +1,9 @@
 #include "agent.h"
 #include "game.h"
 #include "io_expander.h"
-#include "pause.h"
 #include "rtos_queues.h"
 #include "task.h"
+#include "uart_cmd.h"
 #include "utils.h"
 #include <mxc_errors.h>
 
@@ -23,7 +23,7 @@
  */
 #define GAME_TASK_PRIORITY (tskIDLE_PRIORITY + 3)
 #define AGENT_TASK_PRIORITY (tskIDLE_PRIORITY + 2)
-#define TASK_STACK_SIZE (configMINIMAL_STACK_SIZE * 2)  // 256 words per task
+#define TASK_STACK_SIZE (configMINIMAL_STACK_SIZE * 2) // 256 words per task
 
 #define INIT_SUCCESS 0
 
@@ -41,7 +41,7 @@
  */
 static long init_all(void) {
     long err;
-    TaskHandle_t game_handle;  // Handle needed for task suspend/resume in pause.c
+    TaskHandle_t game_handle; // Handle needed for task suspend/resume in pause.c
 
     // Initialize I2C GPIO expander (MAX7325) for buttons and LEDs
     // This must complete before any task tries to read buttons or control LEDs
@@ -62,12 +62,12 @@ static long init_all(void) {
     // xTaskCreate() allocates stack from FreeRTOS heap and adds task to ready list
     // Task will start running after vTaskStartScheduler() is called
     if ((err = xTaskCreate(
-             game_task,              // Task function pointer
-             "Game",                 // Task name (for debugging)
-             TASK_STACK_SIZE,        // Stack size in words
-             NULL,                   // Task parameters (none)
-             GAME_TASK_PRIORITY,     // Priority level (3)
-             &game_handle            // OUT: Handle for task control (suspend/resume)
+             game_task,          // Task function pointer
+             "Game",             // Task name (for debugging)
+             TASK_STACK_SIZE,    // Stack size in words
+             NULL,               // Task parameters (none)
+             GAME_TASK_PRIORITY, // Priority level (3)
+             &game_handle        // OUT: Handle for task control (suspend/resume)
          ))
         != pdPASS) {
         eputs("failed to create Game task", err);
@@ -86,8 +86,8 @@ static long init_all(void) {
     // - Creates highest-priority pause task (Priority 4)
     // - Configures UART interrupt to trigger task notification
     // - Stores game_handle for vTaskSuspend()/vTaskResume() operations
-    if ((err = pause_init(game_handle)) != E_SUCCESS) {
-        eputs("failed to init Pause ", err);
+    if ((err = uart_cmd_init(game_handle)) != E_SUCCESS) {
+        eputs("failed to init uart_cmd", err);
         return err;
     }
 

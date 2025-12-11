@@ -1,19 +1,20 @@
 /**
- * @file pause.c
- * @brief Pause/resume control using FreeRTOS task notifications and ISR
+ * @file uart_cmd.c
+ * @brief UART command handler using FreeRTOS task notifications and ISR
  *
- * Demonstrates key FreeRTOS patterns:
- * 1. Task Notifications - Lightweight synchronization (faster than queues/semaphores)
- * 2. ISR-safe operations - xTaskNotifyFromISR() with yield handling
- * 3. Task suspend/resume - Direct task control using handles
- * 4. Interrupt-driven I/O - UART RX interrupt triggers pause logic
+ * Commands:
+ * - P: Toggle pause (via task notification)
+ * - R: Reset game
+ * - S: Start game
+ * - 1-8: Set level
+ * - I: Identify (respond with device ID)
  *
  * Architecture:
- * UART RX Interrupt ('P' received) -> xTaskNotifyFromISR() -> Pause Task wakes
- * Pause Task -> vTaskSuspend()/vTaskResume() -> Game Task paused/resumed
+ * UART RX Interrupt -> command dispatch -> task notification or queue
  */
 
-#include "pause.h"
+#include "uart_cmd.h"
+#include "agent.h"
 #include "board.h"
 #include "nvic_table.h"
 #include "portmacro.h"
@@ -24,9 +25,9 @@
 
 // Task handles for suspend/resume operations
 // Must be static globals so ISR and pause_task can access them
-static TaskHandle_t game_task_handle;   // Handle to game task (for suspend/resume)
-static TaskHandle_t pause_task_handle;  // Handle to pause task (for notifications)
-static bool paused = false;             // Current pause state
+static TaskHandle_t game_task_handle;  // Handle to game task (for suspend/resume)
+static TaskHandle_t pause_task_handle; // Handle to pause task (for notifications)
+static bool paused = false;            // Current pause state
 
 /**
  * @brief UART RX interrupt handler - Triggers pause on 'P' character
@@ -45,7 +46,7 @@ static bool paused = false;             // Current pause state
  */
 void UART_Handler(void) {
     mxc_uart_regs_t* uart = MXC_UART_GET_UART(CONSOLE_UART);
-    BaseType_t woken = pdFALSE;  // Track if higher-priority task should run after ISR
+    BaseType_t woken = pdFALSE; // Track if higher-priority task should run after ISR
 
     // Clear interrupt flags to prevent re-triggering
     uint32_t flags = MXC_UART_GetFlags(uart);
@@ -77,13 +78,13 @@ void UART_Handler(void) {
             const cmd_msg_t cmd = {.type = CMD_START};
             xQueueSendFromISR(cmd_queue, &cmd, &woken);
         } else if (c >= '1' && c <= '8') {
-            // Forward level set command to game task via cmd_queue
             const cmd_msg_t cmd = {
                 .type = CMD_SET_LEVEL,
                 .level = (uint8_t)(c - '0'),
             };
-            // Best-effort: if queue is full we drop the command (game drains frequently)
             xQueueSendFromISR(cmd_queue, &cmd, &woken);
+        } else if (c == 'I') {
+            identify_requested = true;
         }
     }
 
@@ -112,7 +113,7 @@ void UART_Handler(void) {
  * @param param Unused task parameter (required by FreeRTOS task signature)
  */
 static void pause_task(void* const param) {
-    (void)param;  // Suppress unused parameter warning
+    (void)param; // Suppress unused parameter warning
 
     // Task main loop - never exits
     while (true) {
@@ -150,18 +151,12 @@ static void pause_task(void* const param) {
 }
 
 /**
- * @brief Initialize pause system: Create task, configure UART interrupt
+ * @brief Initialize UART command handler: Create pause task, configure interrupt
  *
- * Setup sequence:
- * 1. Store game task handle for suspend/resume operations
- * 2. Create highest-priority pause task
- * 3. Configure UART to interrupt on RX character
- * 4. Register ISR and enable interrupt in NVIC
- *
- * @param game_handle Handle to game task (obtained from xTaskCreate in main.c)
+ * @param game_handle Handle to game task (for suspend/resume)
  * @return E_SUCCESS on success, error code otherwise
  */
-BaseType_t pause_init(const TaskHandle_t game_handle) {
+BaseType_t uart_cmd_init(const TaskHandle_t game_handle) {
     // Store game task handle so pause_task can suspend/resume it
     game_task_handle = game_handle;
 
@@ -169,12 +164,12 @@ BaseType_t pause_init(const TaskHandle_t game_handle) {
     // Stack: configMINIMAL_STACK_SIZE (128 words) is sufficient - task does minimal work
     // Priority: configMAX_PRIORITIES - 1 ensures immediate response to pause commands
     BaseType_t err = xTaskCreate(
-        pause_task,                  // Task function
-        "Pause",                     // Name for debugging
-        configMINIMAL_STACK_SIZE,    // Stack size (minimal - task is simple)
-        NULL,                        // No parameters
-        configMAX_PRIORITIES - 1,    // Highest priority (Priority 4)
-        &pause_task_handle           // OUT: Handle for task notifications
+        pause_task,               // Task function
+        "Pause",                  // Name for debugging
+        configMINIMAL_STACK_SIZE, // Stack size (minimal - task is simple)
+        NULL,                     // No parameters
+        configMAX_PRIORITIES - 1, // Highest priority (Priority 4)
+        &pause_task_handle        // OUT: Handle for task notifications
     );
 
     if (err != pdPASS) return err;

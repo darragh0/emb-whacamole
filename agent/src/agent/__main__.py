@@ -9,9 +9,7 @@ from .logging_conf import init_logging
 
 def main() -> None:
     init_logging()
-    broker, port = get_env_vars()
-    args = get_args()
-    bridge = Bridge(mqtt_broker=broker, mqtt_port=port, **args)
+    bridge = Bridge(**get_env_vars(), **get_args())
 
     with contextlib.suppress(KeyboardInterrupt):
         bridge.run()

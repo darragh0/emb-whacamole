@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 import logging
 import time
-from typing import ClassVar
+from logging import _levelToName
+from typing import ClassVar, Literal, cast, override
 
-from rich.console import Console
+from .utils import cerr, cout
+
+type LogLevel = Literal[10, 20, 30, 40, 50]
 
 
 class RichStyleHandler(logging.Handler):
@@ -16,29 +21,33 @@ class RichStyleHandler(logging.Handler):
         logging.CRITICAL: "bold red",
     }
 
+    @override
     def __init__(self) -> None:
         super().__init__()
-        self._stdout = Console()
-        self._stderr = Console(stderr=True)
+        self._stdout = cout
+        self._stderr = cerr
 
+    @override
     def emit(self, record: logging.LogRecord) -> None:
-        try:
-            color = self.LEVEL_COLORS[record.levelno]
-            lvl = record.levelname[:3].upper()
-            time_str = time.strftime("%X")
-            msg = self.format(record)
-
-            # Color message for WARNING+ only (like original)
-            cons: Console
-            if record.levelno >= logging.WARNING:
-                msg = f"[{color}]{msg}[/]"
-                cons = self._stderr
-            else:
-                cons = self._stdout
-
-            cons.print(f"[dim][{color}][{lvl}][/] [white]({time_str})[/] ::[/] {msg}")
-        except Exception:  # noqa: BLE001 (standard logging.Handler pattern)
+        fmted = RichStyleHandler.fmt_msg(self.format(record), cast("LogLevel", record.levelno))
+        if fmted is None:
             self.handleError(record)
+            return
+
+        cons = self._stderr if record.levelno >= logging.WARNING else self._stdout
+        cons.print(fmted)
+
+    @classmethod
+    def fmt_msg(cls, msg: str, lvlno: LogLevel) -> str | None:
+        try:
+            color = RichStyleHandler.LEVEL_COLORS[lvlno]
+            lvl = _levelToName[lvlno][:3].upper()
+            time_str = time.strftime("%X")
+            msg = f"[{color}]{msg}[/]" if lvlno >= logging.WARNING else msg
+        except KeyError:
+            return None
+
+        return f"[dim][{color}][{lvl}][/] [white]({time_str})[/] ::[/] {msg}"
 
 
 def init_logging() -> None:
