@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from typing import Any
 
 import uvicorn
 
-from cloud.mqtt import subscribe
+from paho.mqtt import publish
+
+from cloud.mqtt import BROKER, PORT, subscribe
 from cloud.state import (
     MAX_PAST_SESSIONS,
     DeviceState,
@@ -103,6 +106,9 @@ def main() -> None:
     client = subscribe(topics, handle_message)
     threading.Thread(target=client.loop_forever, daemon=True).start()
     threading.Thread(target=check_device_timeouts, daemon=True).start()
+
+    logging.info("Broadcasting heartbeat request to all agents")
+    publish.single("whac/all/commands", "H", hostname=BROKER, port=PORT, qos=2)
 
     uvicorn.run("cloud.app:app", host="0.0.0.0", port=8000)  # noqa: S104
 

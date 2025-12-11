@@ -13,7 +13,7 @@ async function fetchDevices() {
 }
 
 async function togglePause(deviceId) {
-  await fetch(`/command/${encodeURIComponent(deviceId)}`, { method: "POST" });
+  await fetch(`/command/${encodeURIComponent(deviceId)}/pause`, { method: "POST" });
 }
 
 async function sendReset(deviceId) {

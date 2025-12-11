@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import socket
 from typing import TYPE_CHECKING, Any, Final
 
-from paho.mqtt import publish
 from paho.mqtt.client import Client, ConnectFlags
 from paho.mqtt.enums import CallbackAPIVersion
 
 from .env import get_env_vars
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -24,46 +26,6 @@ if TYPE_CHECKING:
 BROKER: Final
 PORT: Final
 BROKER, PORT = get_env_vars()
-
-
-def send_pause(device_id: str) -> None:
-    publish.single(
-        f"whac/{device_id}/commands",
-        "P",
-        hostname=BROKER,
-        port=PORT,
-        qos=1,
-    )
-
-
-def send_reset(device_id: str) -> None:
-    publish.single(
-        f"whac/{device_id}/commands",
-        "R",
-        hostname=BROKER,
-        port=PORT,
-        qos=1,
-    )
-
-
-def send_start(device_id: str) -> None:
-    publish.single(
-        f"whac/{device_id}/commands",
-        "S",
-        hostname=BROKER,
-        port=PORT,
-        qos=1,
-    )
-
-
-def send_level(device_id: str, level: int) -> None:
-    publish.single(
-        f"whac/{device_id}/commands",
-        str(level),
-        hostname=BROKER,
-        port=PORT,
-        qos=1,
-    )
 
 
 def subscribe(topics: list[str], handler: Callable[[dict[str, Any], str], None]) -> Client:
