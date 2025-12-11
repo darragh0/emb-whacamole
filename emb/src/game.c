@@ -452,7 +452,7 @@ void game_run(void) {
     rng_state = RNG_INIT_STATE;
     drain_cmd_queue();  // Capture latest requested start level before beginning
     if (reset_requested) {
-        apply_reset_state(true);
+        apply_reset_state(false);
         return;  // Reset requested before game starts - stay idle
     }
     uint8_t lvl = requested_level_or_default();  // Start at latest requested level
@@ -463,7 +463,11 @@ void game_run(void) {
     while (lvl < LVLS) {
         // printf("\nLevel %d  |  %d ms  |  Lives: %d\n", lvl + 1, duration_ms, lives);
         game_run_level(lvl, POPS_PER_LVL[lvl]);
-        if (reset_abort_session) return;
+        if (reset_abort_session) {
+            emit_session_end(false);
+            reset_abort_session = false;
+            return;
+        }
         if (lives == 0) {
             // printf("\nGame Over! (Reached Level %d)\n", lvl + 1);
             emit_session_end(false);
@@ -475,6 +479,8 @@ void game_run(void) {
         drain_cmd_queue();             // Let queued requests while paused take effect immediately
         if (reset_requested) {
             apply_reset_state(true);
+            emit_session_end(false);
+            reset_abort_session = false;
             return;
         }
         if (level_change_pending) {
@@ -490,6 +496,8 @@ void game_run(void) {
 
     if (reset_requested) {
         apply_reset_state(true);
+        emit_session_end(false);
+        reset_abort_session = false;
         return;
     }
 
