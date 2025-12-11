@@ -17,7 +17,7 @@ def _mk_parser() -> ArgumentParser:
     )
 
     parser = ArgumentParser(
-        description="UART bridge for Whac-A-Mole device",
+        description="UART bridge for Whack-A-Mole device",
         formatter_class=RichHelpFormatter,
         usage="%(prog)s [cyan]-s [dim]P[/] \\[options][/]",
     )
@@ -33,7 +33,7 @@ def _mk_parser() -> ArgumentParser:
         dest="baud_rate",
         metavar="RATE",
     )
-    arg("--device-id", default="whacamole-dev", help='device ID (default: [green]"whacamole-dev"[/])', metavar="ID")
+    arg("--device-id", default="whacamole-dev", help='fallback device ID if hardware ID unavailable (default: [green]"whacamole-dev"[/])', metavar="ID")
     return parser
 
 
