@@ -1,8 +1,11 @@
 import logging
 import time
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, override
 
-from rich.console import Console
+from .utils import cerr, cout
+
+if TYPE_CHECKING:
+    from rich.console import Console
 
 
 class RichStyleHandler(logging.Handler):
@@ -16,11 +19,13 @@ class RichStyleHandler(logging.Handler):
         logging.CRITICAL: "bold red",
     }
 
+    @override
     def __init__(self) -> None:
         super().__init__()
-        self._stdout = Console()
-        self._stderr = Console(stderr=True)
+        self._stdout = cout
+        self._stderr = cerr
 
+    @override
     def emit(self, record: logging.LogRecord) -> None:
         try:
             color = self.LEVEL_COLORS[record.levelno]
@@ -28,7 +33,7 @@ class RichStyleHandler(logging.Handler):
             time_str = time.strftime("%X")
             msg = self.format(record)
 
-            # Color message for WARNING+ only (like original)
+            # Color actual message for >=WARNING only
             cons: Console
             if record.levelno >= logging.WARNING:
                 msg = f"[{color}]{msg}[/]"
@@ -42,8 +47,4 @@ class RichStyleHandler(logging.Handler):
 
 
 def init_logging() -> None:
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(message)s",
-        handlers=[RichStyleHandler()],
-    )
+    logging.basicConfig(level=logging.DEBUG, handlers=[RichStyleHandler()])

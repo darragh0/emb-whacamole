@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
 
 from paho.mqtt.client import Client, ConnectFlags, DisconnectFlags, MQTTMessage
@@ -21,10 +22,12 @@ if TYPE_CHECKING:
     from paho.mqtt.properties import Properties
     from paho.mqtt.reasoncodes import ReasonCode
 
-    from .types import DevStatus, StatusPayload
+    from .types import CommonPayload, DevStatus, StatusPayload
 
 RECONNECT_TIMEOUT_SECS: Final = 600
-RECONNECT_RETRY_INTERVAL: Final = 2  # secs
+RECONNECT_RETRY_INTERVAL: Final = 2
+DEVICE_ID_TIMEOUT_SECS: Final = 10
+DEVICE_ID_RETRY_INTERVAL: Final = 0.1
 
 
 class Bridge:
@@ -53,7 +56,7 @@ class Bridge:
     mqtt_port: int
     serial_port: str
     baud_rate: int
-    device_id: str | None
+    device_id: str
 
     _log: Logger
     _serial: Serial
@@ -83,14 +86,14 @@ class Bridge:
         """Connect to MQTT and UART, then process events."""
 
         # Connect to serial
-        self._log.info("Connecting to %s (%d baud)", self.serial_port, self.baud_rate)
+        self._log.info("Connecting to [yellow]%s[/] (%d baud)", self.serial_port, self.baud_rate)
         try:
             self._serial = Serial(self.serial_port, self.baud_rate, timeout=0.1)
         except SerialException as e:
             self._log.error("Failed to connect to serial port: %s", e)
             return
 
-        self._log.info("Connected to %s", self.serial_port)
+        self._log.info("Connected to [yellow]%s[/]", self.serial_port)
 
         if not self._request_device_id():
             self._log.error("Failed to get device ID from device")
@@ -148,18 +151,24 @@ class Bridge:
                 self._serial.close()
                 return
 
-            line = line_bytes.decode(Bridge.BYTES_ENCODING, errors="replace").strip()
+            try:
+                line = line_bytes.decode(Bridge.BYTES_ENCODING, errors="replace").strip()
+            except UnicodeDecodeError as e:
+                self._log.error("Decode error (%s) while reading line: %s", Bridge.BYTES_ENCODING, e)
+                continue
+
             if line.startswith("{"):
                 self._process_event(line)
             # Ignore other lines
 
     def _wait_for_reconnect(self) -> bool:
         """Wait for serial device to reconnect. Returns True if reconnected."""
+
         with Status("") as status:
             start = time.monotonic()
             while (elapsed := time.monotonic() - start) < RECONNECT_TIMEOUT_SECS:
-                remaining = int(RECONNECT_TIMEOUT_SECS - elapsed)
-                status.update(f"Reconnecting ({remaining}s remaining)")
+                left = int(RECONNECT_TIMEOUT_SECS - elapsed)
+                status.update(f"  [dim]>[/] Reconnecting ({left}s remaining)")
                 try:
                     self._serial = Serial(self.serial_port, self.baud_rate, timeout=0.1)
                 except SerialException:
@@ -173,16 +182,27 @@ class Bridge:
 
     def _request_device_id(self) -> bool:
         """Send identify command and wait for response. Returns True on success."""
-        self._log.info("Requesting device ID...")
-        self._serial.write(b"I")
 
-        timeout_count = 0
-        max_timeout = 100  # 10 seconds at 0.1s timeout
+        self._log.info("Requesting device ID")
+        self._serial.write(b"I")  # Identify
 
-        while timeout_count < max_timeout:
-            try:
-                line_bytes = self._serial.readline()
-                line = line_bytes.decode(Bridge.BYTES_ENCODING, errors="replace").strip()
+        with Status("") as status:
+            start = time.monotonic()
+            while (elapsed := time.monotonic() - start) < DEVICE_ID_TIMEOUT_SECS:
+                left = int(DEVICE_ID_TIMEOUT_SECS - elapsed)
+                status.update(f" [dim]>[/] Waiting for device ID ({left}s remaining)")
+
+                try:
+                    line_bytes = self._serial.readline()
+                    line = line_bytes.decode(Bridge.BYTES_ENCODING, errors="replace").strip()
+
+                except SerialException as e:
+                    self._log.error("Serial error while getting device ID: %s", e)
+                    return False
+
+                except UnicodeDecodeError as e:
+                    self._log.error("Decode error (%s) while getting device ID: %s", Bridge.BYTES_ENCODING, e)
+                    continue
 
                 if line.startswith("{"):
                     try:
@@ -191,34 +211,30 @@ class Bridge:
                             self.device_id = event["device_id"]
                             self._log.info("Device ID: %s", self.device_id)
                             return True
-                    except json.JSONDecodeError:
-                        pass
-                elif line:
-                    continue
-                timeout_count += 1
-            except SerialException as e:
-                self._log.error("Serial error while getting device ID: %s", e)
-                break
+                    except JSONDecodeError as e:
+                        self._log.warning("Invalid JSON: %s (error: %s)", line, e)
 
+                time.sleep(DEVICE_ID_RETRY_INTERVAL)
+
+        self._log.error("Device ID request timeout after %ds", DEVICE_ID_TIMEOUT_SECS)
         return False
 
     def _process_event(self, jsonl: str) -> None:
-        """Process and publish a JSON event from the device."""
+        """Process and publish JSON event from the device."""
         try:
             event = json.loads(jsonl)
-        except json.JSONDecodeError as e:
+        except JSONDecodeError as e:
             self._log.warning("Invalid JSON: %s (error: %s)", jsonl, e)
             return
 
         self._publish_event(event)
 
-    def _publish_event(self, event: dict[str, Any]) -> None:
-        """Publish a game event to MQTT (enriches with device_id and timestamp)."""
-        event["device_id"] = self.device_id
-        event["ts"] = time_now_ms()
-        self._log.debug("[bright_white on grey30][Device -> MQTT][/] %s", event)
+    def _publish_event(self, pload: dict[str, Any]) -> None:
+        """Publish game event to MQTT (enriches with device_id and timestamp)."""
+        pload |= self._common_payload()
         topic = self._topic("game_events")
-        self._mqtt.publish(topic, json.dumps(event), qos=1)
+        self._log.debug("[bright_white on grey30][Device -> MQTT][/] %s", pload)
+        self._mqtt.publish(topic, json.dumps(pload), qos=1)
 
     def _publish_state(self, status: DevStatus) -> None:
         """Publish current device state to MQTT."""
@@ -234,16 +250,11 @@ class Bridge:
 
         byte = message.payload
         if byte not in Bridge.VALID_COMMANDS:
-            self._log.warning('[MQTT -> Device] INVALID COMMAND: "%s"', byte)
+            self._log.warning("[MQTT -> Device] INVALID COMMAND: %r", byte)
             return
 
         desc = Bridge.VALID_COMMANDS[byte]
-        try:
-            payload_str = byte.decode(Bridge.BYTES_ENCODING)
-        except UnicodeDecodeError:
-            payload_str = repr(byte)
-
-        self._log.info("[bright_white on grey30][MQTT -> Device][/] %s (%s)", payload_str, desc)
+        self._log.info("[bright_white on grey30][MQTT -> Device][/] %r (%s)", byte, desc)
         self._serial.write(byte)
 
         _ = client, userdata
@@ -251,11 +262,15 @@ class Bridge:
     ################################################ Utility Functions #################################################
 
     def _status_payload(self, status: DevStatus) -> StatusPayload:
-        """Return a status payload for bridge state messages."""
-        return {"device_id": self.device_id, "ts": time_now_ms(), "status": status}
+        """Return status payload for bridge state messages."""
+        return {**self._common_payload(), "status": status}
+
+    def _common_payload(self) -> CommonPayload:
+        """Return common payload for outgoing MQTT messages."""
+        return {"device_id": self.device_id, "ts": time_now_ms()}
 
     def _topic(self, topic: Bridge.Topic) -> str:
-        """Return a MQTT topic string for a given topic type.
+        """Return MQTT topic string for a given topic type.
 
         Args:
             topic: Topic type
@@ -263,7 +278,7 @@ class Bridge:
         return f"{Bridge.TOPIC_NAMESPACE}/{self.device_id}/{topic}"
 
     def _device_connected(self) -> bool:
-        """Check if the serial device is still physically connected."""
+        """Check if serial device is physically connected."""
         available = [p.device for p in list_ports.comports()]
         return self.serial_port in available
 
@@ -298,5 +313,9 @@ class Bridge:
     ) -> None:
         """Handle MQTT disconnection."""
 
-        self._log.warning("MQTT disconnected (rc=%s), will attempt reconnect", reason_code)
+        if not reason_code.is_failure:
+            self._log.info("Disconnected from MQTT %s:%d", self.mqtt_broker, self.mqtt_port)
+            return
+
+        self._log.warning("MQTT disconnect failed with rc=%s", reason_code)
         _ = client, userdata, disconnect_flags, properties
