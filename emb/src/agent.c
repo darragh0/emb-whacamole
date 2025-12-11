@@ -18,14 +18,17 @@
  */
 
 #include "agent.h"
+#include "mxc_sys.h"
 #include "rtos_queues.h"
 #include "utils.h"
-#include "mxc_sys.h"
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 // Outcome enum -> string mapping for JSON serialization
 static const char* const OUTCOME_STR[] = {"hit", "miss", "late"};
+
+// Set by UART ISR when 'I' command received
+volatile bool identify_requested = false;
 
 /**
  * @brief Serialize game event to JSON and send over UART
@@ -44,7 +47,7 @@ static const char* const OUTCOME_STR[] = {"hit", "miss", "late"};
 
 #define DEVID_LEN 10
 
-const char* get_devid(void) {
+static const char* get_devid(void) {
     static char id[DEVID_LEN + 1];
     static bool initialized = false;
 
@@ -53,60 +56,60 @@ const char* get_devid(void) {
     uint8_t usn[MXC_SYS_USN_LEN];
     if (MXC_SYS_GetUSN(usn, NULL) != E_NO_ERROR) return NULL;
 
-    snprintf(id, sizeof(id), "%02x%02x%02x%02x%02x",
+    snprintf(
+        id,
+        sizeof(id),
+        "%02x%02x%02x%02x%02x",
         usn[MXC_SYS_USN_LEN - 5],
         usn[MXC_SYS_USN_LEN - 4],
         usn[MXC_SYS_USN_LEN - 3],
         usn[MXC_SYS_USN_LEN - 2],
-        usn[MXC_SYS_USN_LEN - 1]);
+        usn[MXC_SYS_USN_LEN - 1]
+    );
 
     initialized = true;
     return id;
 }
 
-static void send_event_json(const game_event_t* const event) {
+static void send_identify(void) {
     const char* device_id = get_devid();
-    if (!device_id) return;  // Failed to get device ID
+    if (!device_id) return;
+    printf("{\"event_type\":\"identify\",\"device_id\":\"%s\"}\n", device_id);
+    fflush(stdout);
+}
 
-    // Serialize event based on type
+static void send_event_json(const game_event_t* const event) {
     switch (event->type) {
         case EVENT_SESSION_START:
-            // Game session starting - no additional data
             printf("{\"event_type\":\"session_start\"}\n");
             break;
 
         case EVENT_POP_RESULT:
-            // Individual mole pop result with all game state
             printf(
                 "{\"event_type\":\"pop_result\",\"mole_id\":%u,\"outcome\":\"%s\","
                 "\"reaction_ms\":%u,\"lives\":%u,\"lvl\":%u,\"pop\":%u,\"pops_total\":%u}\n",
-                event->data.pop.mole,                  // Which LED/button (0-7)
-                OUTCOME_STR[event->data.pop.outcome],  // hit/miss/late
-                event->data.pop.reaction_ms,           // Player reaction time
-                event->data.pop.lives,                 // Remaining lives
-                event->data.pop.level,                 // Current level (1-8)
-                event->data.pop.pop_index,             // Pop number in level
-                event->data.pop.pops_total             // Total pops in level (10)
+                event->data.pop.mole,
+                OUTCOME_STR[event->data.pop.outcome],
+                event->data.pop.reaction_ms,
+                event->data.pop.lives,
+                event->data.pop.level,
+                event->data.pop.pop_index,
+                event->data.pop.pops_total
             );
             break;
 
         case EVENT_LEVEL_COMPLETE:
-            // Level successfully completed
             printf(
                 "{\"event_type\":\"lvl_complete\",\"lvl\":%u}\n", event->data.level_complete.level
             );
             break;
 
         case EVENT_SESSION_END:
-            // Game over - win or loss
             printf(
                 "{\"event_type\":\"session_end\",\"win\":%s}\n", TF(event->data.session_end.won)
             );
             break;
     }
-
-    // Force immediate transmission - Don't wait for buffer to fill
-    // This ensures low-latency event delivery to cloud backend
     fflush(stdout);
 }
 
@@ -137,51 +140,22 @@ static void send_event_json(const game_event_t* const event) {
  * @param param Unused task parameter (required by FreeRTOS task signature)
  */
 void agent_task(void* const param) {
-    (void)param;  // Suppress unused parameter warning
+    (void)param;
 
-    // Send device identification on startup
-    const char* device_id = get_devid();
-    if (device_id) {
-        printf("{\"msg_type\":\"device_id\",\"device_id\":\"%s\"}\n", device_id);
-        fflush(stdout);
-    }
+    game_event_t event;
 
-    game_event_t event;  // Stack-allocated event buffer for queue copy
-
-    // Task main loop - never exits
     while (true) {
-        /**
-         * Drain event queue burst:
-         * Inner while loop processes all pending events before sleeping.
-         * This batches UART transmissions for efficiency when events arrive
-         * in rapid succession (e.g., during level transitions).
-         *
-         * xQueueReceive() behavior:
-         * - Blocks for up to 10ms if queue is empty
-         * - Returns pdTRUE if event was received, pdFALSE on timeout
-         * - Copies event data from queue to &event (pass-by-value)
-         * - Automatically handles synchronization with game_task
-         */
-        while (xQueueReceive(event_queue, &event, pdMS_TO_TICKS(10)) == pdTRUE) {
-            // Event received from queue - Send as JSON over UART
-            send_event_json(&event);
-
-            // Loop continues until queue is empty or timeout
-            // If game produces events faster than UART can send, queue will
-            // buffer them up to EVENT_QUEUE_LENGTH (32 events). If queue
-            // fills, game_task will block briefly on xQueueSend().
+        // Handle identify request from bridge
+        if (identify_requested) {
+            identify_requested = false;
+            send_identify();
         }
 
-        /**
-         * Sleep for 10ms before checking queue again
-         *
-         * vTaskDelay() puts task in Blocked state, allowing other tasks to run.
-         * When 10ms elapses, task returns to Ready state and scheduler will
-         * run it when no higher-priority tasks are ready.
-         *
-         * This sleep prevents busy-waiting on empty queue, reducing CPU usage
-         * when system is idle (no game events being generated).
-         */
+        // Drain event queue
+        while (xQueueReceive(event_queue, &event, pdMS_TO_TICKS(10)) == pdTRUE) {
+            send_event_json(&event);
+        }
+
         MS_SLEEP(10);
     }
 }

@@ -33,14 +33,12 @@ def _mk_parser() -> ArgumentParser:
         dest="baud_rate",
         metavar="RATE",
     )
-    arg("--device-id", default="whacamole-dev", help='fallback device ID if hardware ID unavailable (default: [green]"whacamole-dev"[/])', metavar="ID")
     return parser
 
 
 class Args(TypedDict):
     serial_port: str
     baud_rate: int
-    device_id: str
 
 
 def get_args() -> Args:
