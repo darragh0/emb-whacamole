@@ -28,6 +28,7 @@ RECONNECT_TIMEOUT_SECS: Final = 600
 RECONNECT_RETRY_INTERVAL: Final = 2
 DEVICE_ID_TIMEOUT_SECS: Final = 10
 DEVICE_ID_RETRY_INTERVAL: Final = 0.1
+HEARTBEAT_INTERVAL_SECS: Final = 20
 
 
 class Bridge:
@@ -36,7 +37,11 @@ class Bridge:
     type Topic = Literal["state", "commands", "game_events"]
 
     TOPIC_NAMESPACE: ClassVar = "whac"
-    VALID_COMMANDS: ClassVar[dict[bytes, str]] = {
+    BYTES_ENCODING: ClassVar = "ascii"
+    AGENT_COMMANDS: ClassVar[dict[bytes, str]] = {
+        b"H": "heartbeat request",
+    }
+    BOARD_COMMANDS: ClassVar[dict[bytes, str]] = {
         b"I": "identify",
         b"P": "pause toggle",
         b"R": "reset game",
@@ -50,7 +55,6 @@ class Bridge:
         b"7": "set level 7",
         b"8": "set level 8",
     }
-    BYTES_ENCODING: ClassVar = "ascii"
 
     mqtt_broker: str
     mqtt_port: int
@@ -113,7 +117,7 @@ class Bridge:
         # MQTT will
         pload = self._status_payload("offline")
         topic = self._topic("state")
-        self._mqtt.will_set(topic, payload=json.dumps(pload), qos=1, retain=True)
+        self._mqtt.will_set(topic, payload=json.dumps(pload), qos=2, retain=False)
 
         self._log.info("Connecting to MQTT broker [bright_magenta]%s:%d[/]", self.mqtt_broker, self.mqtt_port)
         self._mqtt.connect_async(self.mqtt_broker, self.mqtt_port, keepalive=30)
@@ -135,6 +139,7 @@ class Bridge:
 
     def _read_events(self) -> None:
         """Read and process events from serial port."""
+        last_heartbeat = time.monotonic()
 
         while True:
             try:
@@ -164,7 +169,11 @@ class Bridge:
 
             if line.startswith("{"):
                 self._process_event(line)
-            # Ignore other lines
+
+            now = time.monotonic()
+            if now - last_heartbeat >= HEARTBEAT_INTERVAL_SECS:
+                self._publish_state("online")
+                last_heartbeat = now
 
     def _wait_for_reconnect(self) -> bool:
         """Wait for serial device to reconnect. Returns True if reconnected."""
@@ -247,26 +256,34 @@ class Bridge:
         pload |= self._common_payload()
         topic = self._topic("game_events")
         self._log.debug("[bright_white on grey30][Device -> MQTT][/] %s", pload)
-        self._mqtt.publish(topic, json.dumps(pload), qos=1)
+        self._mqtt.publish(topic, json.dumps(pload), qos=2)
 
     def _publish_state(self, status: DevStatus) -> None:
         """Publish current device state to MQTT."""
         pload = self._status_payload(status)
         topic = self._topic("state")
         self._log.debug("[bright_white on grey30][Agent -> MQTT][/] %s", pload)
-        self._mqtt.publish(topic, payload=json.dumps(pload), qos=1, retain=True)
+        self._mqtt.publish(topic, payload=json.dumps(pload), qos=2, retain=False)
 
     ####################################################### Sub ########################################################
 
     def _on_message(self, client: Client, userdata: Any, message: MQTTMessage) -> None:  # noqa: ANN401
         """Forward MQTT command to serial device as single-byte command."""
-
         byte = message.payload
-        if byte not in Bridge.VALID_COMMANDS:
+
+        # Special case -- heartbeat (not forwarded to device)
+        if byte in Bridge.AGENT_COMMANDS:
+            match byte:
+                case b"H":
+                    self._log.debug("[bright_white on grey30][MQTT -> Agent][/] Heartbeat request")
+                    self._publish_state("online")
+                    return
+
+        if byte not in Bridge.BOARD_COMMANDS:
             self._log.warning("[MQTT -> Device] INVALID COMMAND: %r", byte)
             return
 
-        desc = Bridge.VALID_COMMANDS[byte]
+        desc = Bridge.BOARD_COMMANDS[byte]
         self._log.info("[bright_white on grey30][MQTT -> Device][/] %r (%s)", byte, desc)
         self._serial.write(byte)
 
@@ -309,8 +326,8 @@ class Bridge:
 
         if not reason_code.is_failure:
             self._log.info("Connected to [bright_magenta]%s:%d[/]", self.mqtt_broker, self.mqtt_port)
-            topic = self._topic("commands")
-            client.subscribe(topic, qos=1)
+            client.subscribe(self._topic("commands"), qos=2)
+            client.subscribe(f"{Bridge.TOPIC_NAMESPACE}/all/commands", qos=2)
             return
 
         self._log.warning("MQTT connect failed with rc=%s", reason_code)
