@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
-from cloud.mqtt import send_level, send_pause
+from cloud.mqtt import send_level, send_pause, send_reset, send_start
 from cloud.state import devices, devices_lock
 
 app: Final = FastAPI()
@@ -29,6 +29,18 @@ async def get_devices() -> list[dict[str, Any]]:
 async def post_command(device_id: str) -> dict[str, bool]:
     # can add more commands later, but just pause for now ig
     send_pause(device_id)
+    return {"ok": True}
+
+
+@app.post("/command/{device_id}/reset")
+async def post_reset_command(device_id: str) -> dict[str, bool]:
+    send_reset(device_id)
+    return {"ok": True}
+
+
+@app.post("/command/{device_id}/start")
+async def post_start_command(device_id: str) -> dict[str, bool]:
+    send_start(device_id)
     return {"ok": True}
 
 

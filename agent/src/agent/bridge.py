@@ -35,6 +35,8 @@ class Bridge:
     TOPIC_NAMESPACE: ClassVar = "whac"
     VALID_COMMANDS: ClassVar[dict[bytes, str]] = {
         b"P": "pause toggle",
+        b"R": "reset game",
+        b"S": "start game",
         b"1": "set level 1",
         b"2": "set level 2",
         b"3": "set level 3",

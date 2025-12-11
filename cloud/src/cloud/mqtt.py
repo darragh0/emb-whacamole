@@ -34,6 +34,26 @@ def send_pause(device_id: str) -> None:
     )
 
 
+def send_reset(device_id: str) -> None:
+    publish.single(
+        f"whac/{device_id}/commands",
+        "R",
+        hostname=BROKER,
+        port=PORT,
+        qos=1,
+    )
+
+
+def send_start(device_id: str) -> None:
+    publish.single(
+        f"whac/{device_id}/commands",
+        "S",
+        hostname=BROKER,
+        port=PORT,
+        qos=1,
+    )
+
+
 def send_level(device_id: str, level: int) -> None:
     publish.single(
         f"whac/{device_id}/commands",

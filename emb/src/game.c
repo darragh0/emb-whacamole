@@ -39,6 +39,9 @@ static uint8_t lives;       // Remaining lives (max 5)
 static uint32_t rng_state;  // Xorshift RNG state for random numbers
 static uint8_t requested_level_idx = 0;  // Latest level request (0-based, 1-8 from cloud)
 static bool level_change_pending = false;  // New level command received
+static bool reset_requested = false;       // Reset request pending
+static bool start_requested = false;       // Start request pending (from cloud)
+static bool reset_abort_session = false;   // Track if reset stopped an in-progress session
 
 // Game difficulty configuration
 static const uint8_t POPS_PER_LVL[8] = {[0 ... 7] = 10};  // 10 pops per level
@@ -131,11 +134,42 @@ static void drain_cmd_queue(void) {
 
     cmd_msg_t cmd;
     while (xQueueReceive(cmd_queue, &cmd, 0) == pdTRUE) {
-        if (cmd.type == CMD_SET_LEVEL && cmd.level >= 1 && cmd.level <= LVLS) {
-            requested_level_idx = cmd.level - 1;  // Convert to 0-based index
-            level_change_pending = true;          // Apply as soon as scheduler lets us run
+        switch (cmd.type) {
+            case CMD_SET_LEVEL:
+                if (cmd.level >= 1 && cmd.level <= LVLS) {
+                    requested_level_idx = cmd.level - 1;  // Convert to 0-based index
+                    level_change_pending = true;          // Apply as soon as scheduler lets us run
+                }
+                break;
+            case CMD_RESET:
+                reset_requested = true;
+                level_change_pending = false;  // Drop pending level changes on reset
+                requested_level_idx = 0;
+                start_requested = false;
+                break;
+            case CMD_START:
+                start_requested = true;
+                break;
         }
     }
+}
+
+/** @brief Apply reset request: clear pending commands and restore defaults */
+static void apply_reset_state(const bool abort_session) {
+    reset_requested = false;
+    level_change_pending = false;
+    start_requested = false;
+    requested_level_idx = 0;
+    lives = LIVES;
+    rng_state = RNG_INIT_STATE;
+    reset_abort_session = abort_session;
+}
+
+/** @brief Consume start request and return whether one was pending */
+static inline bool consume_start_request(void) {
+    const bool start_now = start_requested;
+    start_requested = false;
+    return start_now;
 }
 
 /** @brief Clamp requested level to valid range */
@@ -333,10 +367,18 @@ static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
 
     for (int pop = 0; pop < pops; pop++) {
         drain_cmd_queue();  // Keep up with cloud commands while playing
+        if (reset_requested) {
+            apply_reset_state(true);
+            return;
+        }
         if (should_switch_level(lvl_idx)) return;  // Jump to requested level ASAP
 
         pop_wait_delay(&rng_state);
         drain_cmd_queue();  // Capture requests that arrived during the delay
+        if (reset_requested) {
+            apply_reset_state(true);
+            return;
+        }
         if (should_switch_level(lvl_idx)) return;
 
         uint8_t mole;
@@ -352,6 +394,10 @@ static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
             if (lives == 0) return;
         }
 
+        if (reset_requested) {
+            apply_reset_state(true);
+            return;
+        }
         if (should_switch_level(lvl_idx)) return;
     }
 
@@ -362,8 +408,15 @@ int await_start(void) {
     // printf("Awaiting button press ...\n");
 
     uint8_t btn_state = BTN_HW_STATE;
+restart_idle:
     while (true) {
         drain_cmd_queue();  // Allow cloud level updates while idle
+        if (reset_requested) {
+            apply_reset_state(false);
+            continue;  // Stay idle
+        }
+        if (consume_start_request()) goto success;
+
         uint8_t led_pattern = 0;
         for (int i = 0; i < 8; i++) {
             led_on(i, &led_pattern);
@@ -372,6 +425,11 @@ int await_start(void) {
             for (int j = 0; j < 50; j++) {
                 MS_SLEEP(10);
                 drain_cmd_queue();
+                if (reset_requested) {
+                    apply_reset_state(false);
+                    goto restart_idle;
+                }
+                if (consume_start_request()) goto success;
 
                 int err = io_expander_read_btns(&btn_state);
                 if (err != E_SUCCESS) return err;
@@ -393,13 +451,19 @@ void game_run(void) {
     lives = LIVES;
     rng_state = RNG_INIT_STATE;
     drain_cmd_queue();  // Capture latest requested start level before beginning
+    if (reset_requested) {
+        apply_reset_state(true);
+        return;  // Reset requested before game starts - stay idle
+    }
     uint8_t lvl = requested_level_or_default();  // Start at latest requested level
     level_change_pending = false;                // We just aligned start level
+    start_requested = false;                     // Consume any start request
     emit_session_start();
 
     while (lvl < LVLS) {
         // printf("\nLevel %d  |  %d ms  |  Lives: %d\n", lvl + 1, duration_ms, lives);
         game_run_level(lvl, POPS_PER_LVL[lvl]);
+        if (reset_abort_session) return;
         if (lives == 0) {
             // printf("\nGame Over! (Reached Level %d)\n", lvl + 1);
             emit_session_end(false);
@@ -409,6 +473,10 @@ void game_run(void) {
         }
 
         drain_cmd_queue();             // Let queued requests while paused take effect immediately
+        if (reset_requested) {
+            apply_reset_state(true);
+            return;
+        }
         if (level_change_pending) {
             const uint8_t target_lvl = consume_requested_level();
             if (target_lvl != lvl) {
@@ -418,6 +486,11 @@ void game_run(void) {
         }
 
         lvl++;
+    }
+
+    if (reset_requested) {
+        apply_reset_state(true);
+        return;
     }
 
     // printf("\nCongratulations! Completed all %d levels with %d lives remaining!\n", LVLS, lives);
@@ -435,6 +508,10 @@ void game_task(void* const param) {
         drain_cmd_queue();
         game_run();
         drain_cmd_queue();
+        if (reset_abort_session) {
+            reset_abort_session = false;
+            continue;  // Skip delay so reset returns to idle immediately
+        }
         MS_SLEEP(2000); // Pause before next game
     }
 }

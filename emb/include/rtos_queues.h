@@ -26,6 +26,8 @@
 /** @brief Commands coming from cloud */
 typedef enum {
     CMD_SET_LEVEL = 0,
+    CMD_RESET,
+    CMD_START,
 } cmd_type_t;
 
 /** @brief Type of event sent from game to agent */
@@ -64,7 +66,7 @@ extern QueueHandle_t cmd_queue;
 
 typedef struct {
     cmd_type_t type;
-    uint8_t level;  // 1-8 for CMD_SET_LEVEL
+    uint8_t level;  // 1-8 for CMD_SET_LEVEL (unused for other cmds)
 } cmd_msg_t;
 
 /**
