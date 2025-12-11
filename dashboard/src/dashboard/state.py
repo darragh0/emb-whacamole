@@ -1,12 +1,13 @@
 """Shared state between MQTT handler and API endpoints."""
 
-from __future__ import annotations
-
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Final, Literal
+from typing import Any, Final
+
+from dashboard.types import DevGameState, DevStatus
 
 MAX_PAST_SESSIONS: Final = 5
+DEV_LOCK: Final = threading.Lock()
 
 
 @dataclass
@@ -24,12 +25,11 @@ class DeviceState:
     """Tracks state of a device."""
 
     device_id: str
-    status: Literal["online", "serial_error", "offline"] = "offline"
-    game_state: Literal["playing", "idle"] = "idle"
+    status: DevStatus = "offline"
+    game_state: DevGameState = "idle"
     last_seen: int = 0
     current_session: Session | None = None
     past_sessions: list[Session] = field(default_factory=list)
 
 
 devices: dict[str, DeviceState] = {}
-devices_lock = threading.Lock()

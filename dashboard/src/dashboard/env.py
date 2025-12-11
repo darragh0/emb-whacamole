@@ -1,35 +1,80 @@
 import os
 import sys
-from typing import Final, NoReturn, cast
+from typing import Final, NamedTuple
 
 from dotenv import load_dotenv
 
-PORT_MIN: Final = 1
-PORT_MAX: Final = 65535
+from . import __prog__
+
+_PORT_MIN: Final = 1
+_PORT_MAX: Final = 65535
 
 
-def _setup_err(msg: str, exit_code: int = 1) -> NoReturn:
-    print(f"\x1b[1;91mdashboard: setup-error:\x1b[0m {msg}", file=sys.stderr)
-    sys.exit(exit_code)
+class _MqttConf(NamedTuple):
+    mqtt_broker: str
+    mqtt_port: int
+    app_port: int
 
 
-def get_env_vars() -> tuple[str, int]:
-    def ensure_valid_port(port: int) -> None:
-        if not (PORT_MIN <= port <= PORT_MAX):
-            raise ValueError
-
-    load_dotenv()
-    broker = os.getenv("MQTT_BROKER")
-    port_raw = os.getenv("MQTT_PORT")
-
-    for var, name in ((broker, "MQTT_BROKER"), (port_raw, "MQTT_PORT")):
-        if var is None or var.strip() == "":
-            _setup_err(f"\x1b[96m{name}\x1b[0m is missing")
+def _ensure_valid_port(name: str) -> int:
+    val = os.getenv(name)
+    if val is None or not val.strip():
+        msg = f"\x1b[96m{name}\x1b[0m is not set"
+        raise ValueError(msg)
 
     try:
-        port = int(cast("str", port_raw))
-        ensure_valid_port(port)
-    except ValueError:
-        _setup_err(f"\x1b[96mMQTT_PORT\x1b[0m is invalid: \x1b[91m{port_raw}\x1b[0m")
+        port = int(val)
+    except ValueError as e:
+        msg = f"\x1b[96m{name}\x1b[0m is not an integer: {val}"
+        raise ValueError(msg) from e
+    else:
+        if not (_PORT_MIN <= port <= _PORT_MAX):
+            msg = f"\x1b[96m{name}\x1b[0m is out of range: {val}"
+            raise ValueError(msg)
 
-    return cast("str", broker), port
+    return port
+
+
+def _ensure_valid_broker(name: str) -> str:
+    val = os.getenv(name)
+    if val is None or not val.strip():
+        msg = f"\x1b[96m{name}\x1b[0m is not set"
+        raise ValueError(msg)
+
+    return val
+
+
+def _load_env() -> _MqttConf:
+    load_dotenv()
+
+    errs: list[str] = []
+    mbroker: str | None = None
+    mport: int | None = None
+    aport: int | None = None
+
+    try:
+        mbroker = _ensure_valid_broker("MQTT_BROKER")
+    except ValueError as e:
+        errs.append(str(e))
+
+    try:
+        mport = _ensure_valid_port("MQTT_PORT")
+    except ValueError as e:
+        errs.append(str(e))
+
+    try:
+        aport = _ensure_valid_port("APP_PORT")
+    except ValueError as e:
+        errs.append(str(e))
+
+    if mbroker is None or mport is None or aport is None:
+        print("".join(f"\x1b[1;91m{__prog__}: env-error:\x1b[0m {e}\n" for e in errs), end="", file=sys.stderr)
+        sys.exit(1)
+
+    return _MqttConf(mqtt_broker=mbroker, mqtt_port=mport, app_port=aport)
+
+
+BROKER: Final
+MQTT_PORT: Final
+APP_PORT: Final
+BROKER, MQTT_PORT, APP_PORT = _load_env()
