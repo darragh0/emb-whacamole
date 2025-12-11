@@ -1,0 +1,63 @@
+JJ's Task Checklist - Innovation & Commands
+===========================================
+
+## Primary Goal: Boost Innovation Score (30% of marks!)
+
+### ✅ COMPLETED:
+- [x] Level jump command (L1-L8) - cloud to board real-time control
+  - Board: UART handler processes '1'-'8' commands
+  - Cloud: send_level() function and POST endpoint
+  - Dashboard: (Tom should add UI for this)
+
+### 🔄 IN PROGRESS / TODO:
+
+1. Reset Command (R)
+   - Add 'R' handling in pause.c UART_Handler
+   - Send CMD_RESET to game task via cmd_queue
+   - Game task should reset to level 1, restore 5 lives
+   - Cloud: Add send_reset() function in mqtt.py
+   - Cloud: Add POST /command/{device_id}/reset endpoint
+
+2. Start Command (S)
+   - Add 'S' handling in pause.c UART_Handler
+   - Send CMD_START to game task
+   - Game should start if in idle state
+   - Cloud: Add send_start() function
+   - Cloud: Add POST /command/{device_id}/start endpoint
+
+3. Deploy to Alderaan Server
+   - Wait for Mark to install python3.13-venv
+   - Deploy cloud backend to alderaan.software-engineering.ie:8000
+   - Test end-to-end with remote cloud
+
+4. Test Full Stack
+   - Board → Agent → MQTT → Cloud → Dashboard
+   - Test all commands work: Pause, Level jump, Reset, Start
+   - Test disconnect/reconnect resilience
+   - Verify event buffering during disconnects
+
+5. Prepare Demo Script
+   - Write 10-minute demo walkthrough
+   - Practice explaining FreeRTOS patterns
+   - Be ready to explain ANY part of code
+   - Highlight innovation features
+
+### 📊 Team Division:
+- **JJ (you)**: Commands & board-cloud communication (innovation!)
+- **Tom**: Dashboard frontend (stats, charts, polish UI)
+- **Darragh**: Leaderboard feature idea (if time permits)
+
+### 🎯 Focus Areas for Maximum Marks:
+- Innovation (30%) - Commands show sophisticated real-time control
+- Real-time Implementation (20%) - Already strong with FreeRTOS
+- Comms Protocol & Resilience (20%) - MQTT, reconnection, buffering
+- Code Quality (15%) - Comments added ✓
+- Demo (15%) - Practice and polish
+
+### 💡 Quick Wins Remaining:
+1. Add R and S commands (2 hours)
+2. Test everything works (1 hour)
+3. Deploy to cloud server (30 min once python3-venv is ready)
+4. Practice demo (1 hour)
+
+TOTAL TIME REMAINING: ~4-5 hours to maximizing marks!

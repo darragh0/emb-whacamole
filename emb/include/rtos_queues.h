@@ -18,9 +18,15 @@
 
 /** @brief Maximum events in the event queue */
 #define EVENT_QUEUE_LENGTH 32
+#define CMD_QUEUE_LENGTH 8
 
 #define RTOS_QUEUES_OK 0
 #define RTOS_QUEUES_ERR -1
+
+/** @brief Commands coming from cloud */
+typedef enum {
+    CMD_SET_LEVEL = 0,
+} cmd_type_t;
 
 /** @brief Type of event sent from game to agent */
 typedef enum {
@@ -54,6 +60,12 @@ typedef struct {
 
 // Queue handles (extern - defined in rtos_queues.c)
 extern QueueHandle_t event_queue;
+extern QueueHandle_t cmd_queue;
+
+typedef struct {
+    cmd_type_t type;
+    uint8_t level;  // 1-8 for CMD_SET_LEVEL
+} cmd_msg_t;
 
 /**
  * @brief Initialize queues

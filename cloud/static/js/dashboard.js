@@ -1,6 +1,11 @@
 const REFRESH_INTERVAL = 500;
 
 const knownDevices = new Map();
+const LEVELS = Array.from({ length: 8 }, (_, idx) => idx + 1);
+const LEVEL_BTN_ENABLED =
+  "level-btn bg-sky-600 hover:bg-sky-500 text-gray-50 font-medium px-2.5 py-1 rounded-md text-sm transition-colors";
+const LEVEL_BTN_DISABLED =
+  "level-btn bg-gray-700 opacity-60 cursor-not-allowed text-gray-300 font-medium px-2.5 py-1 rounded-md text-sm";
 
 async function fetchDevices() {
   const res = await fetch("/devices");
@@ -9,6 +14,17 @@ async function fetchDevices() {
 
 async function togglePause(deviceId) {
   await fetch(`/command/${encodeURIComponent(deviceId)}`, { method: "POST" });
+}
+
+async function sendLevel(deviceId, level) {
+  await fetch(`/command/${encodeURIComponent(deviceId)}/level/${level}`, {
+    method: "POST",
+  });
+}
+
+function handleLevelButtonClick(deviceId, level) {
+  if (!Number.isInteger(level) || level < 1 || level > 8) return;
+  sendLevel(deviceId, level);
 }
 
 function formatRelativeTime(ms) {
@@ -178,6 +194,22 @@ function createDeviceCard(device) {
           </div>
           <div class="flex items-center gap-3">
             <span class="game-badge">${getGameStateBadge(device)}</span>
+            <div class="flex items-center gap-2 level-control">
+              <span class="text-xs text-gray-500">Level</span>
+              <div class="flex gap-1 level-buttons">
+                ${LEVELS.map(
+                  (lvl) => `
+                    <button
+                      onclick="handleLevelButtonClick('${device.device_id}', ${lvl})"
+                      class="${isOffline ? LEVEL_BTN_DISABLED : LEVEL_BTN_ENABLED}"
+                      ${isOffline ? "disabled" : ""}
+                    >
+                      ${lvl}
+                    </button>
+                  `,
+                ).join("")}
+              </div>
+            </div>
             <button
               onclick="togglePause('${device.device_id}')"
               class="pause-btn bg-amber-500 hover:bg-amber-400 text-gray-900 ${pauseDisabled} font-medium py-1.5 px-4 rounded-lg text-sm transition-colors"
@@ -217,6 +249,12 @@ function updateDeviceCard(card, device) {
     pauseBtn.className =
       "pause-btn bg-amber-500 hover:bg-amber-400 text-gray-900 font-medium py-1.5 px-4 rounded-lg text-sm transition-colors";
   }
+
+  const levelBtns = card.querySelectorAll(".level-btn");
+  levelBtns.forEach((btn) => {
+    btn.disabled = isOffline;
+    btn.className = isOffline ? LEVEL_BTN_DISABLED : LEVEL_BTN_ENABLED;
+  });
 
   if (isOffline) {
     card.classList.add("card-offline");
