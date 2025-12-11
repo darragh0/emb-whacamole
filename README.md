@@ -37,6 +37,7 @@ Follow these steps to install agent or cloud locally:
 - Python >= 3.12
 
 #### Using uv
+cd into agent or cloud
 
 ```bash
 uv sync && . ./.venv/bin/activate
