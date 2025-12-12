@@ -12,6 +12,7 @@ from dashboard.types import StatusOk
 
 LVL_MIN: Final = 1
 LVL_MAX: Final = 8
+# Leaderboard
 
 app: Final = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parents[2] / "static"), name="static")
