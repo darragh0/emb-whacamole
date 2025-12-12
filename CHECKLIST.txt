@@ -1,0 +1,65 @@
+Project Checklist - Final Tasks
+================================
+
+## Testing & Verification (CRITICAL - 40% of marks!)
+
+### Real-time Implementation (20%)
+- [ ] Verify control task and agent task run at different priorities
+- [ ] Confirm bi-directional queuing between threads is implemented
+- [ ] Document which queues exist and their purpose
+
+### Comms Protocol & Resilience (20%)
+- [ ] Test: Game continues running when agent is disconnected (unplug USB)
+- [ ] Test: Agent can disconnect and reconnect mid-game
+- [ ] Test: Events buffer correctly during disconnect
+- [ ] Verify device auto-reconnects when agent comes back
+
+### Innovation (30%)
+- [ ] Test all commands work: Pause, Start, Reset, Level (1-8)
+- [ ] Prepare to explain why commands demonstrate innovation
+- [ ] Highlight real-time cloud control in demo
+
+## Code Quality (15%)
+
+- [ ] Add comments explaining FreeRTOS task priorities
+- [ ] Document queue mechanisms and thread communication
+- [ ] Ensure code is modular and readable
+- [ ] Remove any commented-out debug code
+- [ ] Verify all team members understand ALL code sections
+
+## Demo Preparation (15%)
+
+- [ ] Write 10-minute demo script:
+  * Show device working (game play)
+  * Show dashboard updates in real-time
+  * Demonstrate commands from cloud
+  * Explain FreeRTOS architecture
+  * Highlight innovation features
+
+- [ ] Practice explaining:
+  * Thread priorities and why they're set that way
+  * Queue mechanisms for inter-thread communication
+  * Protocol design between agent and device
+  * How disconnects/reconnects are handled
+
+- [ ] Be ready to answer questions about ANY code section
+
+## Final Checks
+
+- [ ] Clean working directory (no build artifacts in git)
+- [ ] Update README with setup instructions
+- [ ] Test end-to-end one final time before demo
+- [ ] Ensure all three team members can explain the system
+
+## Key Points to Emphasize in Demo/Interview
+
+1. **Innovation**: Real-time cloud commands (P/S/R/1-8) show sophisticated control
+2. **Real-time**: FreeRTOS with proper priorities and queuing
+3. **Resilience**: Works without agent, handles disconnects gracefully
+4. **Protocol**: Custom JSON-over-UART protocol
+5. **Code Quality**: Well-structured, commented, team-understood
+
+---
+
+TOTAL ESTIMATED TIME: 4-6 hours
+Focus on testing & verification first - that's 40% of marks!
