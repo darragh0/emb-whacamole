@@ -3,16 +3,21 @@ Project Checklist - Final Tasks
 
 ## Testing & Verification (CRITICAL - 40% of marks!)
 
-### Real-time Implementation (20%)
-- [ ] Verify control task and agent task run at different priorities
-- [ ] Confirm bi-directional queuing between threads is implemented
-- [ ] Document which queues exist and their purpose
+### FR-3: Real-time Implementation (20%)
+- [ ] **VERIFY**: Control task and agent/UART task run at DIFFERENT priorities
+- [ ] **VERIFY**: Bi-directional queues exist between threads (identify which queues)
+- [ ] **DOCUMENT**: List all FreeRTOS tasks with their priorities
+- [ ] **DOCUMENT**: List all queues and what data flows through them
 
 ### Comms Protocol & Resilience (20%)
 - [ ] Test: Game continues running when agent is disconnected (unplug USB)
 - [ ] Test: Agent can disconnect and reconnect mid-game
 - [ ] Test: Events buffer correctly during disconnect
 - [ ] Verify device auto-reconnects when agent comes back
+- [ ] **NEW**: Add CRC checksum to JSON messages for error detection
+- [ ] **NEW**: Implement sequence numbers to detect missed/duplicate packets
+- [ ] **NEW**: Add message acknowledgment for critical commands
+- [ ] **NEW**: Test corrupted message handling (simulate bad data)
 
 ### Innovation (30%)
 - [ ] Test all commands work: Pause, Start, Reset, Level (1-8)
@@ -29,8 +34,9 @@ Project Checklist - Final Tasks
 
 ## Demo Preparation (15%)
 
-- [ ] Write 10-minute demo script:
+- [ ] Write 3-5-minute demo script:
   * Show device working (game play)
+  * Do powerpoint presentation
   * Show dashboard updates in real-time
   * Demonstrate commands from cloud
   * Explain FreeRTOS architecture
