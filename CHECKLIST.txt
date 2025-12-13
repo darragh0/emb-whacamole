@@ -9,12 +9,15 @@ Project Checklist - Final Tasks
 - [ ] **DOCUMENT**: List all FreeRTOS tasks with their priorities
 - [ ] **DOCUMENT**: List all queues and what data flows through them
 
-### FR-4: Comms Protocol & Resilience (20%)
-- [ ] **TEST**: Game runs correctly WITHOUT agent attached (unplug USB mid-game)
-- [ ] **TEST**: Agent disconnect and reconnect while game is running
-- [ ] **TEST**: Device buffers events when agent disconnected
-- [ ] **TEST**: Device auto-reconnects when agent comes back
-- [ ] **VERIFY**: Proprietary protocol documented (JSON-over-UART)
+### Comms Protocol & Resilience (20%)
+- [ ] Test: Game continues running when agent is disconnected (unplug USB)
+- [ ] Test: Agent can disconnect and reconnect mid-game
+- [ ] Test: Events buffer correctly during disconnect
+- [ ] Verify device auto-reconnects when agent comes back
+- [ ] **NEW**: Add CRC checksum to JSON messages for error detection
+- [ ] **NEW**: Implement sequence numbers to detect missed/duplicate packets
+- [ ] **NEW**: Add message acknowledgment for critical commands
+- [ ] **NEW**: Test corrupted message handling (simulate bad data)
 
 ### Innovation (30%)
 - [ ] Test all commands work: Pause, Start, Reset, Level (1-8)
@@ -31,8 +34,9 @@ Project Checklist - Final Tasks
 
 ## Demo Preparation (15%)
 
-- [ ] Write 10-minute demo script:
+- [ ] Write 3-5-minute demo script:
   * Show device working (game play)
+  * Do powerpoint presentation
   * Show dashboard updates in real-time
   * Demonstrate commands from cloud
   * Explain FreeRTOS architecture
