@@ -3,16 +3,18 @@ Project Checklist - Final Tasks
 
 ## Testing & Verification (CRITICAL - 40% of marks!)
 
-### Real-time Implementation (20%)
-- [ ] Verify control task and agent task run at different priorities
-- [ ] Confirm bi-directional queuing between threads is implemented
-- [ ] Document which queues exist and their purpose
+### FR-3: Real-time Implementation (20%)
+- [ ] **VERIFY**: Control task and agent/UART task run at DIFFERENT priorities
+- [ ] **VERIFY**: Bi-directional queues exist between threads (identify which queues)
+- [ ] **DOCUMENT**: List all FreeRTOS tasks with their priorities
+- [ ] **DOCUMENT**: List all queues and what data flows through them
 
-### Comms Protocol & Resilience (20%)
-- [ ] Test: Game continues running when agent is disconnected (unplug USB)
-- [ ] Test: Agent can disconnect and reconnect mid-game
-- [ ] Test: Events buffer correctly during disconnect
-- [ ] Verify device auto-reconnects when agent comes back
+### FR-4: Comms Protocol & Resilience (20%)
+- [ ] **TEST**: Game runs correctly WITHOUT agent attached (unplug USB mid-game)
+- [ ] **TEST**: Agent disconnect and reconnect while game is running
+- [ ] **TEST**: Device buffers events when agent disconnected
+- [ ] **TEST**: Device auto-reconnects when agent comes back
+- [ ] **VERIFY**: Proprietary protocol documented (JSON-over-UART)
 
 ### Innovation (30%)
 - [ ] Test all commands work: Pause, Start, Reset, Level (1-8)
