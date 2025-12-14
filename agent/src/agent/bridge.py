@@ -84,6 +84,7 @@ class Bridge:
         self._serial: Serial
         self._mqtt: Client
         self._paused: bool = False
+        self._mqtt_connected: bool = False
 
     ####################################################### Pub ########################################################
 
@@ -123,6 +124,19 @@ class Bridge:
         self._log.info("Connecting to MQTT broker [bright_magenta]%s:%d[/]", self.mqtt_broker, self.mqtt_port)
         self._mqtt.connect_async(self.mqtt_broker, self.mqtt_port, keepalive=30)
         self._mqtt.loop_start()
+
+        # Wait for MQTT connection
+        self._log.info("Waiting for MQTT connection...")
+        timeout = 10
+        start = time.monotonic()
+        while not self._mqtt_connected and (time.monotonic() - start) < timeout:
+            time.sleep(0.1)
+
+        if not self._mqtt_connected:
+            self._log.error("MQTT connection timeout after %ds", timeout)
+            self._mqtt.loop_stop()
+            self._serial.close()
+            return
 
         self._publish_state("online")
 
@@ -351,6 +365,7 @@ class Bridge:
         """Handle MQTT connection."""
 
         if not reason_code.is_failure:
+            self._mqtt_connected = True
             self._log.info("Connected to [bright_magenta]%s:%d[/]", self.mqtt_broker, self.mqtt_port)
             client.subscribe(self._topic("commands"), qos=2)
             client.subscribe(f"{Bridge.TOPIC_NAMESPACE}/all/commands", qos=2)
