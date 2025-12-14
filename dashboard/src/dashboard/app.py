@@ -6,13 +6,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
+from dashboard.leaderboard import get_leaderboard
 from dashboard.mqtt import pub_cmd
 from dashboard.state import DEV_LOCK, devices
 from dashboard.types import StatusOk
 
 LVL_MIN: Final = 1
 LVL_MAX: Final = 8
-# Leaderboard
 
 app: Final = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parents[2] / "static"), name="static")
@@ -27,6 +27,11 @@ async def dashboard() -> FileResponse:
 async def get_devices() -> list[dict[str, Any]]:
     with DEV_LOCK:
         return [asdict(dev) for dev in devices.values()]
+
+
+@app.get("/leaderboard")
+async def get_leaderboard_endpoint() -> list[dict[str, Any]]:
+    return get_leaderboard()
 
 
 @app.post("/command/{device_id}/pause")
