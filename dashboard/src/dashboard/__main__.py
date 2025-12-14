@@ -8,6 +8,7 @@ import uvicorn
 from paho.mqtt import publish
 
 from .env import APP_PORT, BROKER, MQTT_PORT
+from .leaderboard import add_entry, calculate_score
 from .mqtt import subscribe
 from .state import (
     DEV_LOCK,
@@ -78,6 +79,10 @@ def handle_game_event(data: dict[str, Any]) -> None:
                 device.current_session.ended_at = ts
                 device.current_session.won = data.get("win") == "true"
                 device.current_session.events.append(data)
+
+                score = calculate_score(device.current_session.events)
+                add_entry(device_id, score, ts)
+
                 device.past_sessions.insert(0, device.current_session)
                 device.past_sessions = device.past_sessions[:MAX_PAST_SESSIONS]
             device.current_session = None
