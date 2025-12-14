@@ -37,11 +37,32 @@
         <p class="text-gray-400 text-sm mt-1">Device Dashboard</p>
       </header>
 
+      <div class="flex gap-2 mb-6">
+        <button onclick="showTab('devices')" id="tab-devices" class="px-4 py-2 rounded-lg bg-sky-600 text-white font-medium">Devices</button>
+        <button onclick="showTab('leaderboard')" id="tab-leaderboard" class="px-4 py-2 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700">Leaderboard</button>
+      </div>
+
       <div id="devices" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="col-span-full flex items-center justify-center py-16 text-gray-500">
           <div class="text-center">
             <div class="text-5xl mb-4 opacity-50">&#128225;</div>
             <div class="text-lg">Loading devices...</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="leaderboard" class="hidden">
+        <div class="bg-gray-850 rounded-xl shadow-xl overflow-hidden border border-gray-800">
+          <div class="px-5 py-4 bg-gray-800/50">
+            <h2 class="text-xl font-semibold text-white">Top 5 Scores</h2>
+          </div>
+          <div id="leaderboard-list" class="divide-y divide-gray-800">
+            <div class="flex items-center justify-center py-16 text-gray-500">
+              <div class="text-center">
+                <div class="text-5xl mb-4 opacity-50">🏆</div>
+                <div class="text-lg">Loading leaderboard...</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

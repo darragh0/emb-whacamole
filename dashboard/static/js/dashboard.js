@@ -1,6 +1,9 @@
 const REFRESH_INTERVAL = 500;
+const LEADERBOARD_REFRESH_INTERVAL = 5000;
 
 const knownDevices = new Map();
+let currentTab = 'devices';
+let leaderboardInterval;
 const LEVELS = Array.from({ length: 8 }, (_, idx) => idx + 1);
 const LEVEL_BTN_ENABLED =
   "level-btn bg-sky-600 hover:bg-sky-500 text-gray-50 font-medium px-2.5 py-1 rounded-md text-sm transition-colors";
@@ -10,6 +13,37 @@ const LEVEL_BTN_DISABLED =
 async function fetchDevices() {
   const res = await fetch("/jj/devices");
   return res.json();
+}
+
+async function fetchLeaderboard() {
+  const res = await fetch("/jj/leaderboard");
+  return res.json();
+}
+
+function showTab(tab) {
+  currentTab = tab;
+  document.getElementById('devices').classList.toggle('hidden', tab !== 'devices');
+  document.getElementById('leaderboard').classList.toggle('hidden', tab !== 'leaderboard');
+  
+  document.getElementById('tab-devices').className = tab === 'devices'
+    ? 'px-4 py-2 rounded-lg bg-sky-600 text-white font-medium'
+    : 'px-4 py-2 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700';
+  
+  document.getElementById('tab-leaderboard').className = tab === 'leaderboard'
+    ? 'px-4 py-2 rounded-lg bg-sky-600 text-white font-medium'
+    : 'px-4 py-2 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700';
+  
+  if (tab === 'leaderboard') {
+    refreshLeaderboard();
+    if (!leaderboardInterval) {
+      leaderboardInterval = setInterval(refreshLeaderboard, LEADERBOARD_REFRESH_INTERVAL);
+    }
+  } else {
+    if (leaderboardInterval) {
+      clearInterval(leaderboardInterval);
+      leaderboardInterval = null;
+    }
+  }
 }
 
 async function togglePause(deviceId) {
@@ -389,6 +423,45 @@ async function refresh() {
     updateDeviceCard(card, device);
     knownDevices.set(device.device_id, device);
   }
+}
+
+async function refreshLeaderboard() {
+  const list = document.getElementById('leaderboard-list');
+  const entries = await fetchLeaderboard();
+
+  if (entries.length === 0) {
+    list.innerHTML = `
+      <div class="flex items-center justify-center py-16 text-gray-500">
+        <div class="text-center">
+          <div class="text-5xl mb-4 opacity-50">🏆</div>
+          <div class="text-lg">No scores yet</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = entries.map((entry, idx) => {
+    const date = new Date(entry.timestamp);
+    const timeStr = date.toLocaleString();
+    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+    
+    return `
+      <div class="flex items-center justify-between px-5 py-4 hover:bg-gray-800/30">
+        <div class="flex items-center gap-4">
+          <span class="text-2xl w-8">${medal}</span>
+          <div>
+            <div class="font-semibold text-white">${entry.device_id}</div>
+            <div class="text-xs text-gray-500">${timeStr}</div>
+          </div>
+        </div>
+        <div class="text-right">
+          <div class="text-2xl font-bold text-sky-400">${entry.score.toLocaleString()}</div>
+          <div class="text-xs text-gray-500">points</div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 refresh();
