@@ -65,6 +65,10 @@ Required environment variables:
 - `MQTT_BROKER` - MQTT broker URL
 - `MQTT_PORT` - MQTT broker port (default: 1883)
 
+  
+<img width="1080" height="1309" alt="whack" src="https://github.com/user-attachments/assets/bdc11a24-db09-459a-9b3d-74d809fd2ee0" />
+
+
 ## License
 
 Apache-2.0 (see [LICENSE](./LICENSE))
