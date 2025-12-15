@@ -125,21 +125,6 @@ class Bridge:
         self._mqtt.connect_async(self.mqtt_broker, self.mqtt_port, keepalive=30)
         self._mqtt.loop_start()
 
-        # Wait for MQTT connection
-        self._log.info("Waiting for MQTT connection...")
-        timeout = 10
-        start = time.monotonic()
-        while not self._mqtt_connected and (time.monotonic() - start) < timeout:
-            time.sleep(0.1)
-
-        if not self._mqtt_connected:
-            self._log.error("MQTT connection timeout after %ds", timeout)
-            self._mqtt.loop_stop()
-            self._serial.close()
-            return
-
-        self._publish_state("online")
-
         try:
             self._read_events()
         finally:
