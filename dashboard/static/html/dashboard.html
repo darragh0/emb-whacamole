@@ -1,19 +1,19 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Whac-A-Mole Dashboard</title>
 
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-    rel="stylesheet"
-  />
-
+    rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
-
+  <link rel="icon" type="image/x-icon" href="/jj/static/ico/favicon.ico" />
   <script>
     tailwind.config = {
       theme: {
@@ -33,44 +33,28 @@
       },
     };
   </script>
-
   <link rel="stylesheet" href="/jj/static/css/dashboard.css" />
-  <link rel="icon" type="image/x-icon" href="/jj/static/ico/favicon.ico" />
 </head>
 
 
 
 <body class="bg-gray-950 text-gray-100 min-h-screen font-sans">
   <div class="max-w-7xl mx-auto px-6 py-8">
+    <header class="mb-8">
+      <!-- <h1 class="text-3xl font-bold text-white tracking-tight">Whac-A-Mole</h1> -->
 
-    <!-- Header -->
-    <header class="mb-6 flex items-center gap-4">
-      <img src="/jj/static/ico/molelogo.png" alt="Mole Logo" class="w-20 h-auto" />
-      <div>
-        <h1 class="text-2xl font-bold text-white tracking-tight">Whac-A-Mole</h1>
-        <p class="text-gray-400 text-sm">Device Dashboard</p>
-      </div>
+      <img src="/jj/static/ico/molelogo.png" style="width: 80px;" />
+
+      <p class="text-gray-400 text-sm mt-1">Device Dashboard</p>
     </header>
 
-    <!-- Tabs -->
     <div class="flex gap-2 mb-6">
-      <button
-        onclick="showTab('devices')"
-        id="tab-devices"
-        class="px-4 py-2 rounded-lg bg-sky-600 text-white font-medium"
-      >
-        Devices
-      </button>
-      <button
-        onclick="showTab('leaderboard')"
-        id="tab-leaderboard"
-        class="px-4 py-2 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700"
-      >
-        Leaderboard
-      </button>
+      <button onclick="showTab('devices')" id="tab-devices"
+        class="px-4 py-2 rounded-lg bg-sky-600 text-white font-medium">Devices</button>
+      <button onclick="showTab('leaderboard')" id="tab-leaderboard"
+        class="px-4 py-2 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700">Leaderboard</button>
     </div>
 
-    <!-- Devices -->
     <div id="devices" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div class="col-span-full flex items-center justify-center py-16 text-gray-500">
         <div class="text-center">
@@ -79,8 +63,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Leaderboard -->
     <div id="leaderboard" class="hidden">
       <div class="bg-gray-850 rounded-xl shadow-xl overflow-hidden border border-gray-800">
         <div class="px-5 py-4 bg-gray-800/50">
