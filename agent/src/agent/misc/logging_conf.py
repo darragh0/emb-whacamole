@@ -2,25 +2,36 @@ from __future__ import annotations
 
 import logging
 import time
-from logging import _levelToName
-from typing import TYPE_CHECKING, ClassVar, Literal, cast, override
+from typing import TYPE_CHECKING, ClassVar, Final, Literal, cast, override
 
 from .utils import cerr, cout
 
 if TYPE_CHECKING:
-    type _LogLvl = Literal[10, 20, 30, 40, 50]
+    type LogLvl = Literal[10, 20, 30, 40, 50]
+
+
+LOG_ABBREV_2_LVL: Final[dict[str, LogLvl]] = {
+    "DBG": logging.DEBUG,
+    "INF": logging.INFO,
+    "WRN": logging.WARNING,
+    "ERR": logging.ERROR,
+    "CRT": logging.CRITICAL,
+}
+
+
+LOG_LVL_2_COLOR: Final = {
+    logging.DEBUG: "green",
+    logging.INFO: "cyan",
+    logging.WARNING: "yellow",
+    logging.ERROR: "red",
+    logging.CRITICAL: "bold red",
+}
 
 
 class _RichStyleHandler(logging.Handler):
     """Logging handler with Rich markup support and custom format."""
 
-    LEVEL_COLORS: ClassVar = {
-        logging.DEBUG: "green",
-        logging.INFO: "cyan",
-        logging.WARNING: "yellow",
-        logging.ERROR: "red",
-        logging.CRITICAL: "bold red",
-    }
+    LVL_2_ABBREV: ClassVar = {v: k for k, v in LOG_ABBREV_2_LVL.items()}
 
     @override
     def __init__(self) -> None:
@@ -30,7 +41,7 @@ class _RichStyleHandler(logging.Handler):
 
     @override
     def emit(self, record: logging.LogRecord) -> None:
-        fmted = _RichStyleHandler._fmt_msg(self.format(record), cast("_LogLvl", record.levelno))
+        fmted = _RichStyleHandler._fmt_msg(self.format(record), cast("LogLvl", record.levelno))
         if fmted is None:
             self.handleError(record)
             return
@@ -39,21 +50,26 @@ class _RichStyleHandler(logging.Handler):
         cons.print(fmted)
 
     @classmethod
-    def _fmt_msg(cls, msg: str, lvlno: _LogLvl) -> str | None:
+    def _fmt_msg(cls, msg: str, lvlno: LogLvl) -> str | None:
         try:
-            color = _RichStyleHandler.LEVEL_COLORS[lvlno]
-            lvl = _levelToName[lvlno][:3].upper()
+            color = LOG_LVL_2_COLOR[lvlno]
+            lvl_abbrev = _RichStyleHandler.LVL_2_ABBREV[lvlno]
             time_str = time.strftime("%X")
             msg = f"[{color}]{msg}[/]" if lvlno >= logging.WARNING else msg
         except KeyError:
             return None
 
-        return f"[dim][{color}][{lvl}][/] [white]({time_str})[/] ::[/] {msg}"
+        return f"[dim][{color}][{lvl_abbrev}][/] [white]({time_str})[/] ::[/] {msg}"
 
 
-def init_logging() -> None:
+def init_logging(lvl: LogLvl) -> None:
+    """Initialize logging.
+
+    Args:
+        lvl: Logging level
+    """
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=lvl,
         format="%(message)s",
         handlers=[_RichStyleHandler()],
     )
