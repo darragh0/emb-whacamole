@@ -36,13 +36,13 @@ def _mk_parser() -> ArgumentParser:
     return parser
 
 
-class Args(TypedDict):
+class _Args(TypedDict):
     serial_port: str
     baud_rate: int
 
 
-def get_args() -> Args:
+def get_cli_args() -> _Args:
     """Create & return the argument parser."""
     parser = _mk_parser()
     args = parser.parse_args()
-    return cast("Args", args.__dict__)
+    return cast("_Args", args.__dict__)

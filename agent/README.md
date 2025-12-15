@@ -30,12 +30,11 @@ pip install .        # or `pip install -e .` for development
 .
 ├── pyproject.toml
 ├── README.md
-├── ruff.toml
-└── src
-    └── agent
-        ├── argparser.py       # Argument parser setup
-        ├── bridge.py          # Main serial interaction code
+└── src/
+    └── agent/
         ├── __init__.py
-        ├── logging_conf.py    # Rich logging setup
-        └── __main__.py        # Main entry point
+        ├── __main__.py        # Entry point
+        ├── bridge.py          # UART-to-MQTT bridge
+        ├── mqtt.py            # MQTT client wrapper
+        └── misc/              # Unimportant miscellaneous stuff
 ```

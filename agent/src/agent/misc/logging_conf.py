@@ -3,14 +3,15 @@ from __future__ import annotations
 import logging
 import time
 from logging import _levelToName
-from typing import ClassVar, Literal, cast, override
+from typing import TYPE_CHECKING, ClassVar, Literal, cast, override
 
 from .utils import cerr, cout
 
-type LogLevel = Literal[10, 20, 30, 40, 50]
+if TYPE_CHECKING:
+    type _LogLvl = Literal[10, 20, 30, 40, 50]
 
 
-class RichStyleHandler(logging.Handler):
+class _RichStyleHandler(logging.Handler):
     """Logging handler with Rich markup support and custom format."""
 
     LEVEL_COLORS: ClassVar = {
@@ -29,7 +30,7 @@ class RichStyleHandler(logging.Handler):
 
     @override
     def emit(self, record: logging.LogRecord) -> None:
-        fmted = RichStyleHandler.fmt_msg(self.format(record), cast("LogLevel", record.levelno))
+        fmted = _RichStyleHandler._fmt_msg(self.format(record), cast("_LogLvl", record.levelno))
         if fmted is None:
             self.handleError(record)
             return
@@ -38,9 +39,9 @@ class RichStyleHandler(logging.Handler):
         cons.print(fmted)
 
     @classmethod
-    def fmt_msg(cls, msg: str, lvlno: LogLevel) -> str | None:
+    def _fmt_msg(cls, msg: str, lvlno: _LogLvl) -> str | None:
         try:
-            color = RichStyleHandler.LEVEL_COLORS[lvlno]
+            color = _RichStyleHandler.LEVEL_COLORS[lvlno]
             lvl = _levelToName[lvlno][:3].upper()
             time_str = time.strftime("%X")
             msg = f"[{color}]{msg}[/]" if lvlno >= logging.WARNING else msg
@@ -54,5 +55,5 @@ def init_logging() -> None:
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(message)s",
-        handlers=[RichStyleHandler()],
+        handlers=[_RichStyleHandler()],
     )

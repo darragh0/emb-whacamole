@@ -1,15 +1,14 @@
 import contextlib
 
-from agent.env import get_env_vars
+from agent.misc.env import get_env_vars
 
-from .argparser import get_args
 from .bridge import Bridge
-from .logging_conf import init_logging
+from .misc import get_cli_args, init_logging
 
 
 def main() -> None:
     init_logging()
-    bridge = Bridge(**get_env_vars(), **get_args())
+    bridge = Bridge(**get_env_vars(), **get_cli_args())
 
     with contextlib.suppress(KeyboardInterrupt):
         bridge.run()

@@ -4,7 +4,8 @@ from typing import Final, TypedDict
 
 from dotenv import load_dotenv
 
-from . import __prog__
+from agent.__init__ import __prog__
+
 from .utils import cerr
 
 _PORT_MIN: Final = 1
