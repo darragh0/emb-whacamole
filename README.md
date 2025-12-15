@@ -1,6 +1,12 @@
-# emb-whacamole
+<div align="center">
+  <a href="./assets/img/whacamole.png" target="_blank">
+    <img src="./assets/img/whacamole.png" alt="Embedded Whac-A-Mole Logo" width="650">
+  </a>
+</div>
 
-Whac-A-Mole game for Analog Devices' [MAX32655 MCU](https://www.analog.com/en/products/max32655.html).
+<br />
+<p align="center">A Whac-A-Mole game for Analog Devices' [MAX32655 MCU](https://www.analog.com/en/products/max32655.html)</p>
+<br />
 
 ## Architecture
 
@@ -20,11 +26,11 @@ Whac-A-Mole game for Analog Devices' [MAX32655 MCU](https://www.analog.com/en/pr
 
 ## Components
 
-| Directory    | Description                                                                                        |
-| ------------ | -------------------------------------------------------------------------------------------------- |
-| `emb/`       | **FreeRTOS firmware** – Runs game loop; sends JSON events over UART; receives b"P" (Pause) command |
-| `agent/`     | **Python UART-MQTT bridge** – Bidirectional relay between device & dashboard                       |
-| `dashboard/` | **MQTT backend + web dashboard** – Persists events to JSONL; sends commands to device              |
+| Directory    | Description                                                                                           |
+| ------------ | ----------------------------------------------------------------------------------------------------- |
+| `emb/`       | **FreeRTOS firmware** – Runs game loop; sends JSON events over UART; receives commands from dashboard |
+| `agent/`     | **Python UART-MQTT bridge** – Bidirectional relay between device & dashboard                          |
+| `dashboard/` | **Web dashboard (as MQTT backend)** – Persists events to JSONL; sends commands to device              |
 
 ## Installation
 
@@ -65,9 +71,8 @@ Required environment variables:
 - `MQTT_BROKER` - MQTT broker URL
 - `MQTT_PORT` - MQTT broker port (default: 1883)
 
-  
-<img width="1080" height="1309" alt="whack" src="https://github.com/user-attachments/assets/bdc11a24-db09-459a-9b3d-74d809fd2ee0" />
-
+> [!NOTE]
+> If you are running the dashboard locally, you will need to set the `APP_PORT` environment variable (to the port you want to run the dashboard on).
 
 ## License
 
