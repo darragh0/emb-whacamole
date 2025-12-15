@@ -7,7 +7,7 @@ from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
 
 from paho.mqtt.client import Client, ConnectFlags, DisconnectFlags, MQTTMessage
-from paho.mqtt.enums import CallbackAPIVersion
+from paho.mqtt.enums import CallbackAPIVersion, MQTTErrorCode
 from rich.status import Status
 from serial import Serial, SerialException
 from serial.tools import list_ports
@@ -84,7 +84,6 @@ class Bridge:
         self._serial: Serial
         self._mqtt: Client
         self._paused: bool = False
-        self._mqtt_connected: bool = False
 
     ####################################################### Pub ########################################################
 
@@ -122,8 +121,19 @@ class Bridge:
         self._mqtt.will_set(topic, payload=json.dumps(pload), qos=2, retain=False)
 
         self._log.info("Connecting to MQTT broker [bright_magenta]%s:%d[/]", self.mqtt_broker, self.mqtt_port)
-        self._mqtt.connect_async(self.mqtt_broker, self.mqtt_port, keepalive=30)
+        try:
+            res = self._mqtt.connect(self.mqtt_broker, self.mqtt_port, keepalive=30)
+            if res != MQTTErrorCode.MQTT_ERR_SUCCESS:
+                self._log.error("MQTT connect failed with rc=%s", res)
+                self._serial.close()
+                return
+        except OSError as e:
+            self._log.error("MQTT connection failed: %s", e)
+            self._serial.close()
+            return
+
         self._mqtt.loop_start()
+        self._publish_state("online")
 
         try:
             self._read_events()
@@ -350,7 +360,6 @@ class Bridge:
         """Handle MQTT connection."""
 
         if not reason_code.is_failure:
-            self._mqtt_connected = True
             self._log.info("Connected to [bright_magenta]%s:%d[/]", self.mqtt_broker, self.mqtt_port)
             client.subscribe(self._topic("commands"), qos=2)
             client.subscribe(f"{Bridge.TOPIC_NAMESPACE}/all/commands", qos=2)
