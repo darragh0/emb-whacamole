@@ -5,24 +5,26 @@
 </div>
 
 <br />
-<p align="center">A Whac-A-Mole game for Analog Devices' [MAX32655 MCU](https://www.analog.com/en/products/max32655.html)</p>
-<br />
 
-## Architecture
+<div align="center">
 
-```
-┌──────────────┐     MQTT      ┌─────────────┐
-│  dashboard/  │<------------->│   agent/    │
-│  Dashboard   │               │   Bridge    │
-└──────────────┘               └─────────────┘
-                                     ^
-                                     ¦ UART
-                                     ∨
-                               ┌─────────────┐
-                               │    emb/     │
-                               │   Device    │
-                               └─────────────┘
-```
+<p>
+    A Whac-A-Mole game for Analog Devices'
+    <a href="https://www.analog.com/en/products/max32655.html">MAX32655 MCU</a>
+</p>
+
+[![License][license-img]][license-url]&nbsp;
+[![SDK][sdk-img]][sdk-url]&nbsp;
+[![Python][py-img]][py-url]
+
+</div>
+
+[license-img]: https://img.shields.io/github/license/darragh0/emb-whacamole?style=flat-square&logo=apache&label=%20&color=red
+[license-url]: https://github.com/darragh0/emb-whacamole?tab=Apache-2.0-1-ov-file
+[sdk-img]: https://img.shields.io/badge/MaximSDK-3DB385?style=flat-square&logo=task&logoColor=white
+[sdk-url]: https://github.com/analogdevicesinc/msdk
+[py-img]: https://img.shields.io/badge/3.12%2B-blue?style=flat-square&logo=python&logoColor=FFFD85
+[py-url]: https://www.python.org/
 
 ## Components
 
@@ -72,8 +74,8 @@ Required environment variables:
 - `MQTT_PORT` - MQTT broker port (default: 1883)
 
 > [!NOTE]
-> If you are running the dashboard locally, you will need to set the `APP_PORT` environment variable (to the port you want to run the dashboard on).
+> If you are running the dashboard locally, you'll need to set the `APP_PORT` environment variable (to the port to run the dashboard on)
 
 ## License
 
-Apache-2.0 (see [LICENSE](./LICENSE))
+[Apache-2.0][license-url]
