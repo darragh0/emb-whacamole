@@ -4,7 +4,9 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Final
 
-LEADERBOARD_FILE: Final = Path("data/leaderboard.json")
+BASE_DIR = Path(__file__).resolve().parents[2]
+LEADERBOARD_FILE = BASE_DIR / "data" / "leaderboard.json"
+
 LEADERBOARD_LOCK: Final = threading.Lock()
 MAX_ENTRIES: Final = 5
 
