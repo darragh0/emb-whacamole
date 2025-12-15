@@ -48,6 +48,13 @@
       <p class="text-gray-400 text-sm mt-1">Device Dashboard</p>
     </header>
 
+    <div class="flex gap-2 mb-6">
+      <button onclick="showTab('devices')" id="tab-devices"
+        class="px-4 py-2 rounded-lg bg-sky-600 text-white font-medium">Devices</button>
+      <button onclick="showTab('leaderboard')" id="tab-leaderboard"
+        class="px-4 py-2 rounded-lg bg-gray-800 text-gray-400 font-medium hover:bg-gray-700">Leaderboard</button>
+    </div>
+
     <div id="devices" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div class="col-span-full flex items-center justify-center py-16 text-gray-500">
         <div class="text-center">
