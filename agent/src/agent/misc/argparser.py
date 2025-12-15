@@ -42,7 +42,7 @@ class _Args(TypedDict):
 
 
 def get_cli_args() -> _Args:
-    """Create & return the argument parser."""
+    """Create & return parsed arguments."""
     parser = _mk_parser()
     args = parser.parse_args()
     return cast("_Args", args.__dict__)
