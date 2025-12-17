@@ -78,3 +78,5 @@ BROKER: Final
 MQTT_PORT: Final
 APP_PORT: Final
 BROKER, MQTT_PORT, APP_PORT = _load_env()
+
+APP_ROOT_PATH: Final = os.getenv("APP_ROOT_PATH", "")

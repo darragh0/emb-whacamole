@@ -5,9 +5,8 @@ import time
 from typing import Any, Final
 
 import uvicorn
-from paho.mqtt import publish
 
-from .env import APP_PORT, BROKER, MQTT_PORT
+from .env import APP_PORT, APP_ROOT_PATH
 from .leaderboard import add_entry, calculate_score
 from .mqtt import subscribe
 from .state import (
@@ -109,7 +108,7 @@ def main() -> None:
     threading.Thread(target=client.loop_forever, daemon=True).start()
     threading.Thread(target=check_device_timeouts, daemon=True).start()
 
-    uvicorn.run("dashboard.app:app", host="0.0.0.0", port=APP_PORT)  # noqa: S104
+    uvicorn.run("dashboard.app:app", host="0.0.0.0", port=APP_PORT, root_path=APP_ROOT_PATH)  # noqa: S104
 
 
 if __name__ == "__main__":

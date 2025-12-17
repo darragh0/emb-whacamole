@@ -11,12 +11,12 @@ const LEVEL_BTN_DISABLED =
   "level-btn bg-gray-700 opacity-60 cursor-not-allowed text-gray-300 font-medium px-2.5 py-1 rounded-md text-sm";
 
 async function fetchDevices() {
-  const res = await fetch("/jj/devices");
+  const res = await fetch("devices");
   return res.json();
 }
 
 async function fetchLeaderboard() {
-  const res = await fetch("/jj/leaderboard");
+  const res = await fetch("leaderboard");
   return res.json();
 }
 
@@ -47,25 +47,25 @@ function showTab(tab) {
 }
 
 async function togglePause(deviceId) {
-  await fetch(`/jj/command/${encodeURIComponent(deviceId)}/pause`, {
+  await fetch(`command/${encodeURIComponent(deviceId)}/pause`, {
     method: "POST",
   });
 }
 
 async function sendReset(deviceId) {
-  await fetch(`/jj/command/${encodeURIComponent(deviceId)}/reset`, {
+  await fetch(`command/${encodeURIComponent(deviceId)}/reset`, {
     method: "POST",
   });
 }
 
 async function sendStart(deviceId) {
-  await fetch(`/jj/command/${encodeURIComponent(deviceId)}/start`, {
+  await fetch(`command/${encodeURIComponent(deviceId)}/start`, {
     method: "POST",
   });
 }
 
 async function sendLevel(deviceId, level) {
-  await fetch(`/jj/command/${encodeURIComponent(deviceId)}/level/${level}`, {
+  await fetch(`command/${encodeURIComponent(deviceId)}/level/${level}`, {
     method: "POST",
   });
 }

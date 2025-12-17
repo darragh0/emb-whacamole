@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
+from dashboard.env import APP_ROOT_PATH
 from dashboard.leaderboard import get_leaderboard
 from dashboard.mqtt import pub_cmd
 from dashboard.state import DEV_LOCK, devices
@@ -15,7 +16,7 @@ LVL_MIN: Final = 1
 LVL_MAX: Final = 8
 
 app: Final = FastAPI()
-app.mount("/static", StaticFiles(directory=Path(__file__).parents[2] / "static"), name="static")
+app.mount(f"{APP_ROOT_PATH}/static", StaticFiles(directory=Path(__file__).parents[2] / "static"), name="static")
 
 
 @app.get("/")
