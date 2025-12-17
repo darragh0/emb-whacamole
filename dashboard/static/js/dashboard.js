@@ -155,7 +155,9 @@ function renderAnalysisModal(session, deviceId, sessionIndex) {
   const analysis = analyzeSession(session);
   if (!analysis) return "";
 
-  const modalId = `analysis-${deviceId}-${sessionIndex}`;
+  const safeDeviceId = String(deviceId).replace(/[^a-zA-Z0-9]/g, "_");
+  const modalId = `analysis-${safeDeviceId}-${sessionIndex}`;
+  const chartId = `chart-${modalId}`;
 
   const weakMoles = analysis.moleStats
     .map((stat, idx) => ({
@@ -166,6 +168,9 @@ function renderAnalysisModal(session, deviceId, sessionIndex) {
     .sort((a, b) => a.rate - b.rate)
     .slice(0, 3);
 
+  // Serialize events for the chart (will be parsed when modal opens)
+  const eventsJson = JSON.stringify(session.events).replace(/"/g, '&quot;');
+
   return `
     <div id="${modalId}" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
       <div class="bg-gray-850 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
@@ -173,8 +178,21 @@ function renderAnalysisModal(session, deviceId, sessionIndex) {
           <h3 class="text-xl font-bold text-white">📊 Game Analysis</h3>
           <button onclick="closeAnalysis('${modalId}')" class="text-gray-400 hover:text-white text-2xl">&times;</button>
         </div>
-        
+
         <div class="p-6 space-y-6">
+          <!-- Score Progression Chart -->
+          <div>
+            <h4 class="text-sm font-semibold text-gray-400 mb-3">📈 Score Progression</h4>
+            <div class="bg-gray-900/50 rounded-lg p-4" style="height: 200px;">
+              <canvas id="${chartId}" data-events="${eventsJson}"></canvas>
+            </div>
+            <div class="flex items-center justify-center gap-4 mt-2 text-xs text-gray-500">
+              <span><span class="inline-block w-3 h-3 bg-emerald-500 rounded-full"></span> Hit</span>
+              <span><span class="inline-block w-3 h-3 bg-rose-500 rounded-full"></span> Miss</span>
+              <span><span class="inline-block w-3 h-3 bg-amber-500 rounded-full"></span> Late</span>
+            </div>
+          </div>
+
           <!-- Overall Stats -->
           <div class="grid grid-cols-3 gap-4">
             <div class="bg-gray-800/50 rounded-lg p-4 text-center">
@@ -250,10 +268,285 @@ function renderAnalysisModal(session, deviceId, sessionIndex) {
 
 function showAnalysis(modalId) {
   document.getElementById(modalId).classList.remove("hidden");
+  // Render chart after modal is visible
+  setTimeout(() => {
+    const canvas = document.getElementById(`chart-${modalId}`);
+    if (canvas && canvas.dataset.events) {
+      const events = JSON.parse(canvas.dataset.events);
+      renderScoreChart(canvas, events);
+    }
+  }, 50);
 }
 
 function closeAnalysis(modalId) {
   document.getElementById(modalId).classList.add("hidden");
+}
+
+// ============ SCORE LINE GRAPH FUNCTIONS ============
+
+// Store chart instances to destroy before re-rendering
+const chartInstances = new Map();
+
+/**
+ * Compute cumulative score timeline from session events
+ * Returns array of {pop, score, level, outcome} for each pop_result event
+ */
+function computeScoreTimeline(events) {
+  const popEvents = events.filter(e => e.event_type === "pop_result");
+  const timeline = [];
+  let cumulativeScore = 0;
+
+  popEvents.forEach((e, idx) => {
+    // Calculate score for this hit (simplified scoring formula)
+    if (e.outcome === "hit") {
+      const lvl = e.lvl || 1;
+      const reactionMs = e.reaction_ms || 500;
+      const speedBonus = Math.max(0.5, 2 - reactionMs / 1000);
+      cumulativeScore += Math.round(100 * lvl * speedBonus);
+    }
+
+    timeline.push({
+      pop: idx + 1,
+      score: cumulativeScore,
+      level: e.lvl || 1,
+      outcome: e.outcome,
+      reactionMs: e.reaction_ms || 0,
+    });
+  });
+
+  return timeline;
+}
+
+/**
+ * Render a score line chart on the given canvas
+ */
+function renderScoreChart(canvas, events) {
+  const ctx = canvas.getContext("2d");
+  const timeline = computeScoreTimeline(events);
+
+  if (timeline.length === 0) return;
+
+  // Destroy existing chart if any
+  if (chartInstances.has(canvas.id)) {
+    chartInstances.get(canvas.id).destroy();
+  }
+
+  // Find level transition points
+  const levelTransitions = [];
+  let lastLevel = 0;
+  timeline.forEach((point, idx) => {
+    if (point.level !== lastLevel) {
+      levelTransitions.push({ idx, level: point.level });
+      lastLevel = point.level;
+    }
+  });
+
+  // Create gradient fill
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, "rgba(14, 165, 233, 0.3)");
+  gradient.addColorStop(1, "rgba(14, 165, 233, 0.0)");
+
+  // Point colors based on outcome
+  const pointColors = timeline.map(p =>
+    p.outcome === "hit" ? "#10b981" :
+    p.outcome === "miss" ? "#f43f5e" : "#f59e0b"
+  );
+
+  const chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: timeline.map(p => p.pop),
+      datasets: [{
+        label: "Score",
+        data: timeline.map(p => p.score),
+        borderColor: "#0ea5e9",
+        backgroundColor: gradient,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors,
+        pointHoverRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: "index",
+      },
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          backgroundColor: "#1f2937",
+          titleColor: "#f3f4f6",
+          bodyColor: "#d1d5db",
+          borderColor: "#374151",
+          borderWidth: 1,
+          padding: 12,
+          callbacks: {
+            title: (items) => `Pop #${items[0].label}`,
+            label: (item) => {
+              const point = timeline[item.dataIndex];
+              return [
+                `Score: ${point.score.toLocaleString()}`,
+                `Level: ${point.level}`,
+                `Result: ${point.outcome.toUpperCase()}`,
+                point.outcome === "hit" ? `Reaction: ${point.reactionMs}ms` : "",
+              ].filter(Boolean);
+            },
+          },
+        },
+        // Custom plugin to draw level markers
+        annotation: {
+          annotations: levelTransitions.slice(1).reduce((acc, t, i) => {
+            acc[`level${t.level}`] = {
+              type: "line",
+              xMin: t.idx,
+              xMax: t.idx,
+              borderColor: "#6b7280",
+              borderWidth: 1,
+              borderDash: [5, 5],
+              label: {
+                display: true,
+                content: `L${t.level}`,
+                position: "start",
+              }
+            };
+            return acc;
+          }, {}),
+        },
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: "Pop #",
+            color: "#9ca3af",
+          },
+          grid: {
+            color: "#374151",
+          },
+          ticks: {
+            color: "#9ca3af",
+          },
+        },
+        y: {
+          title: {
+            display: true,
+            text: "Score",
+            color: "#9ca3af",
+          },
+          grid: {
+            color: "#374151",
+          },
+          ticks: {
+            color: "#9ca3af",
+            callback: (value) => value.toLocaleString(),
+          },
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+
+  chartInstances.set(canvas.id, chart);
+  return chart;
+}
+
+/**
+ * Compute current live score from events (for display)
+ */
+function computeLiveScore(events) {
+  const popEvents = events.filter(e => e.event_type === "pop_result");
+  let score = 0;
+  popEvents.forEach(e => {
+    if (e.outcome === "hit") {
+      const lvl = e.lvl || 1;
+      const reactionMs = e.reaction_ms || 500;
+      const speedBonus = Math.max(0.5, 2 - reactionMs / 1000);
+      score += Math.round(100 * lvl * speedBonus);
+    }
+  });
+  return score;
+}
+
+/**
+ * Render a mini live chart for current session in device card
+ */
+function renderLiveChart(canvasId, events) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+  const timeline = computeScoreTimeline(events);
+
+  if (timeline.length === 0) {
+    // Clear canvas if no events
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+
+  // Destroy existing chart if any
+  if (chartInstances.has(canvasId)) {
+    chartInstances.get(canvasId).destroy();
+  }
+
+  const pointColors = timeline.map(p =>
+    p.outcome === "hit" ? "#10b981" :
+    p.outcome === "miss" ? "#f43f5e" : "#f59e0b"
+  );
+
+  const chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: timeline.map(p => p.pop),
+      datasets: [{
+        data: timeline.map(p => p.score),
+        borderColor: "#0ea5e9",
+        backgroundColor: "rgba(14, 165, 233, 0.1)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: true,
+          backgroundColor: "#1f2937",
+          titleColor: "#f3f4f6",
+          bodyColor: "#d1d5db",
+          callbacks: {
+            title: (items) => `Pop #${items[0].label}`,
+            label: (item) => {
+              const point = timeline[item.dataIndex];
+              return `${point.score.toLocaleString()} pts`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          display: false,
+        },
+        y: {
+          display: false,
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+
+  chartInstances.set(canvasId, chart);
 }
 
 function getStatusConfig(status) {
@@ -421,8 +714,24 @@ function createDeviceCard(device) {
 
   const hasCurrentSession =
     device.current_session && device.current_session.events.length > 0;
+  const hasPopEvents = hasCurrentSession &&
+    device.current_session.events.some(e => e.event_type === "pop_result");
+  const liveChartId = `live-chart-${device.device_id.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
   const currentSessionHtml = hasCurrentSession
-    ? `<div class="event-log max-h-64 overflow-y-auto">${renderEventLog(
+    ? `
+      ${hasPopEvents ? `
+        <div class="px-4 py-3 border-b border-gray-800">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-500 uppercase tracking-wide">Live Score</span>
+            <span class="text-sm font-bold text-sky-400 live-score">${computeLiveScore(device.current_session.events).toLocaleString()} pts</span>
+          </div>
+          <div style="height: 80px;">
+            <canvas id="${liveChartId}" class="live-chart"></canvas>
+          </div>
+        </div>
+      ` : ''}
+      <div class="event-log max-h-48 overflow-y-auto">${renderEventLog(
         device.current_session.events
       )}</div>`
     : "";
@@ -564,24 +873,70 @@ function updateDeviceCard(card, device) {
     card.classList.remove("card-offline");
   }
 
-  // Update current session event log
+  // Update current session event log and live chart
   let eventLog = card.querySelector(".event-log");
+  let liveChartContainer = card.querySelector(".live-chart")?.parentElement?.parentElement;
   const hasCurrentSession =
     device.current_session && device.current_session.events.length > 0;
+  const hasPopEvents = hasCurrentSession &&
+    device.current_session.events.some(e => e.event_type === "pop_result");
+  const liveChartId = `live-chart-${device.device_id.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
   if (hasCurrentSession) {
+    const header = card.querySelector(".bg-gray-800\\/50");
+
+    // Add/update live chart section if we have pop events
+    if (hasPopEvents) {
+      if (!liveChartContainer) {
+        header.insertAdjacentHTML(
+          "afterend",
+          `<div class="px-4 py-3 border-b border-gray-800 live-chart-section">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-gray-500 uppercase tracking-wide">Live Score</span>
+              <span class="text-sm font-bold text-sky-400 live-score">0 pts</span>
+            </div>
+            <div style="height: 80px;">
+              <canvas id="${liveChartId}" class="live-chart"></canvas>
+            </div>
+          </div>`
+        );
+        liveChartContainer = card.querySelector(".live-chart-section");
+      }
+
+      // Update live score display
+      const liveScoreEl = card.querySelector(".live-score");
+      if (liveScoreEl) {
+        liveScoreEl.textContent = `${computeLiveScore(device.current_session.events).toLocaleString()} pts`;
+      }
+
+      // Render/update the live chart
+      renderLiveChart(liveChartId, device.current_session.events);
+    }
+
+    // Add/update event log
     if (!eventLog) {
-      const header = card.querySelector(".bg-gray-800\\/50");
-      header.insertAdjacentHTML(
+      const insertAfter = liveChartContainer || header;
+      insertAfter.insertAdjacentHTML(
         "afterend",
-        `<div class="event-log max-h-64 overflow-y-auto"></div>`
+        `<div class="event-log max-h-48 overflow-y-auto"></div>`
       );
       eventLog = card.querySelector(".event-log");
     }
     eventLog.innerHTML = renderEventLog(device.current_session.events);
     eventLog.scrollTop = eventLog.scrollHeight;
-  } else if (eventLog) {
-    eventLog.remove();
+  } else {
+    // Remove live chart and event log if no current session
+    if (liveChartContainer) {
+      // Destroy chart instance
+      if (chartInstances.has(liveChartId)) {
+        chartInstances.get(liveChartId).destroy();
+        chartInstances.delete(liveChartId);
+      }
+      liveChartContainer.remove();
+    }
+    if (eventLog) {
+      eventLog.remove();
+    }
   }
 
   // Update past sessions only if count changed
