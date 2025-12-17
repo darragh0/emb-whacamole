@@ -29,15 +29,18 @@
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        Cloud Server (alderaan)                              │
-│  ┌─────────────────┐      ┌──────────────────┐      ┌──────────────────┐   │
-│  │    Mosquitto    │◄────►│   Dashboard      │      │     Grafana      │   │
-│  │  MQTT Broker    │      │   (FastAPI)      │      │   (Analytics)    │   │
-│  │    :1883        │      │     :8088        │      │                  │   │
-│  └────────┬────────┘      └──────────────────┘      └──────────────────┘   │
-└───────────┼─────────────────────────────────────────────────────────────────┘
-            │ MQTT (TLS)
+┌──────────────────────────────────────────────────────────────┐
+│                  Cloud Server (alderaan)                     │
+│  ┌─────────────────┐      ┌────────────────────────────┐    │
+│  │    Mosquitto    │◄────►│    Dashboard (FastAPI)     │    │
+│  │  MQTT Broker    │      │  • Web UI & Device Control │    │
+│  │    :1883        │      │  • Live Score Charts       │    │
+│  └────────┬────────┘      │  • Game Analytics          │    │
+│           │               │  • Leaderboard             │    │
+│           │               │         :8088              │    │
+│           │               └────────────────────────────┘    │
+└───────────┼─────────────────────────────────────────────────┘
+            │ MQTT
             │
 ┌───────────┼───────────┐
 │  Laptop   │           │
@@ -89,10 +92,11 @@
 
 ### Advanced Game Analytics
 
+- **Live score line graph** – Real-time chart showing score progression during gameplay
 - **Per-button performance heatmaps** – Visual breakdown of hit rate by button position
 - **Reaction time analysis** – Average, best, and distribution of player response times
 - **Practice recommendations** – AI-style suggestions based on player weaknesses
-- **Session history** – Track past games with expandable event logs
+- **Session history** – Track past games with expandable event logs and score charts
 
 ### Intelligent Scoring System
 
