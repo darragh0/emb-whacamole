@@ -284,8 +284,11 @@ function closeAnalysis(modalId) {
 
 // ============ SCORE LINE GRAPH FUNCTIONS ============
 
-// Store chart instances to destroy before re-rendering
+// Store chart instances to update instead of recreating
 const chartInstances = new Map();
+
+// Store last session data per device to persist graph after game ends
+const lastSessionData = new Map();
 
 /**
  * Compute cumulative score timeline from session events
@@ -476,29 +479,36 @@ function computeLiveScore(events) {
 
 /**
  * Render a mini live chart for current session in device card
+ * Updates existing chart if present to avoid visual jitter
  */
 function renderLiveChart(canvasId, events) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  const ctx = canvas.getContext("2d");
   const timeline = computeScoreTimeline(events);
 
   if (timeline.length === 0) {
-    // Clear canvas if no events
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     return;
-  }
-
-  // Destroy existing chart if any
-  if (chartInstances.has(canvasId)) {
-    chartInstances.get(canvasId).destroy();
   }
 
   const pointColors = timeline.map(p =>
     p.outcome === "hit" ? "#10b981" :
     p.outcome === "miss" ? "#f43f5e" : "#f59e0b"
   );
+
+  // If chart already exists, update data instead of recreating
+  if (chartInstances.has(canvasId)) {
+    const chart = chartInstances.get(canvasId);
+    chart.data.labels = timeline.map(p => p.pop);
+    chart.data.datasets[0].data = timeline.map(p => p.score);
+    chart.data.datasets[0].pointBackgroundColor = pointColors;
+    chart.data.datasets[0].pointBorderColor = pointColors;
+    chart.update('none'); // 'none' mode skips animations for smooth updates
+    return;
+  }
+
+  // Create new chart only if one doesn't exist
+  const ctx = canvas.getContext("2d");
 
   const chart = new Chart(ctx, {
     type: "line",
@@ -518,6 +528,7 @@ function renderLiveChart(canvasId, events) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false, // Disable initial animation for smoother live updates
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -721,9 +732,9 @@ function createDeviceCard(device) {
   const currentSessionHtml = hasCurrentSession
     ? `
       ${hasPopEvents ? `
-        <div class="px-4 py-3 border-b border-gray-800">
+        <div class="px-4 py-3 border-b border-gray-800 live-chart-section">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs text-gray-500 uppercase tracking-wide">Live Score</span>
+            <span class="text-xs text-gray-500 uppercase tracking-wide live-label">Live Score</span>
             <span class="text-sm font-bold text-sky-400 live-score">${computeLiveScore(device.current_session.events).toLocaleString()} pts</span>
           </div>
           <div style="height: 80px;">
@@ -875,43 +886,72 @@ function updateDeviceCard(card, device) {
 
   // Update current session event log and live chart
   let eventLog = card.querySelector(".event-log");
-  let liveChartContainer = card.querySelector(".live-chart")?.parentElement?.parentElement;
+  let liveChartContainer = card.querySelector(".live-chart-section");
   const hasCurrentSession =
     device.current_session && device.current_session.events.length > 0;
   const hasPopEvents = hasCurrentSession &&
     device.current_session.events.some(e => e.event_type === "pop_result");
-  const liveChartId = `live-chart-${device.device_id.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const safeDeviceId = device.device_id.replace(/[^a-zA-Z0-9]/g, '_');
+  const liveChartId = `live-chart-${safeDeviceId}`;
 
-  if (hasCurrentSession) {
-    const header = card.querySelector(".bg-gray-800\\/50");
+  // Check if a NEW game session has started (to clear old persisted data)
+  const storedData = lastSessionData.get(device.device_id);
+  const isNewSession = hasCurrentSession &&
+    device.current_session.events.length > 0 &&
+    device.current_session.events[0]?.event_type !== storedData?.firstEventType;
 
-    // Add/update live chart section if we have pop events
-    if (hasPopEvents) {
-      if (!liveChartContainer) {
-        header.insertAdjacentHTML(
-          "afterend",
-          `<div class="px-4 py-3 border-b border-gray-800 live-chart-section">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs text-gray-500 uppercase tracking-wide">Live Score</span>
-              <span class="text-sm font-bold text-sky-400 live-score">0 pts</span>
-            </div>
-            <div style="height: 80px;">
-              <canvas id="${liveChartId}" class="live-chart"></canvas>
-            </div>
-          </div>`
-        );
-        liveChartContainer = card.querySelector(".live-chart-section");
-      }
-
-      // Update live score display
-      const liveScoreEl = card.querySelector(".live-score");
-      if (liveScoreEl) {
-        liveScoreEl.textContent = `${computeLiveScore(device.current_session.events).toLocaleString()} pts`;
-      }
-
-      // Render/update the live chart
-      renderLiveChart(liveChartId, device.current_session.events);
+  // Clear persisted data if a new session starts
+  if (isNewSession && storedData) {
+    lastSessionData.delete(device.device_id);
+    if (chartInstances.has(liveChartId)) {
+      chartInstances.get(liveChartId).destroy();
+      chartInstances.delete(liveChartId);
     }
+    if (liveChartContainer) {
+      liveChartContainer.remove();
+      liveChartContainer = null;
+    }
+  }
+
+  const header = card.querySelector(".bg-gray-800\\/50");
+
+  if (hasCurrentSession && hasPopEvents) {
+    // Active game with pop events - store data for persistence
+    lastSessionData.set(device.device_id, {
+      events: device.current_session.events,
+      score: computeLiveScore(device.current_session.events),
+      firstEventType: device.current_session.events[0]?.event_type,
+      isLive: true
+    });
+
+    if (!liveChartContainer) {
+      header.insertAdjacentHTML(
+        "afterend",
+        `<div class="px-4 py-3 border-b border-gray-800 live-chart-section">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-500 uppercase tracking-wide live-label">Live Score</span>
+            <span class="text-sm font-bold text-sky-400 live-score">0 pts</span>
+          </div>
+          <div style="height: 80px;">
+            <canvas id="${liveChartId}" class="live-chart"></canvas>
+          </div>
+        </div>`
+      );
+      liveChartContainer = card.querySelector(".live-chart-section");
+    }
+
+    // Update live score display
+    const liveScoreEl = card.querySelector(".live-score");
+    if (liveScoreEl) {
+      liveScoreEl.textContent = `${computeLiveScore(device.current_session.events).toLocaleString()} pts`;
+    }
+    const liveLabel = card.querySelector(".live-label");
+    if (liveLabel) {
+      liveLabel.textContent = "Live Score";
+    }
+
+    // Render/update the live chart
+    renderLiveChart(liveChartId, device.current_session.events);
 
     // Add/update event log
     if (!eventLog) {
@@ -924,10 +964,60 @@ function updateDeviceCard(card, device) {
     }
     eventLog.innerHTML = renderEventLog(device.current_session.events);
     eventLog.scrollTop = eventLog.scrollHeight;
+
+  } else if (!hasCurrentSession && storedData) {
+    // Game ended - persist the final chart
+    storedData.isLive = false;
+
+    if (!liveChartContainer) {
+      header.insertAdjacentHTML(
+        "afterend",
+        `<div class="px-4 py-3 border-b border-gray-800 live-chart-section">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-500 uppercase tracking-wide live-label">Final Score</span>
+            <span class="text-sm font-bold text-sky-400 live-score">0 pts</span>
+          </div>
+          <div style="height: 80px;">
+            <canvas id="${liveChartId}" class="live-chart"></canvas>
+          </div>
+        </div>`
+      );
+      liveChartContainer = card.querySelector(".live-chart-section");
+    }
+
+    // Update to show "Final Score" instead of "Live Score"
+    const liveLabel = card.querySelector(".live-label");
+    if (liveLabel) {
+      liveLabel.textContent = "Final Score";
+    }
+    const liveScoreEl = card.querySelector(".live-score");
+    if (liveScoreEl) {
+      liveScoreEl.textContent = `${storedData.score.toLocaleString()} pts`;
+    }
+
+    // Keep the chart showing with stored data
+    renderLiveChart(liveChartId, storedData.events);
+
+    // Remove event log when game ends (it moves to past sessions)
+    if (eventLog) {
+      eventLog.remove();
+    }
+
+  } else if (hasCurrentSession && !hasPopEvents) {
+    // Game started but no pop events yet - show event log only
+    if (!eventLog) {
+      header.insertAdjacentHTML(
+        "afterend",
+        `<div class="event-log max-h-48 overflow-y-auto"></div>`
+      );
+      eventLog = card.querySelector(".event-log");
+    }
+    eventLog.innerHTML = renderEventLog(device.current_session.events);
+    eventLog.scrollTop = eventLog.scrollHeight;
+
   } else {
-    // Remove live chart and event log if no current session
+    // No session and no stored data - clean up everything
     if (liveChartContainer) {
-      // Destroy chart instance
       if (chartInstances.has(liveChartId)) {
         chartInstances.get(liveChartId).destroy();
         chartInstances.delete(liveChartId);
