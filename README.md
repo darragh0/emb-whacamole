@@ -93,6 +93,8 @@
 ### Advanced Game Analytics
 
 - **Live score line graph** – Real-time chart showing score progression during gameplay
+- **Persistent final scores** – Graph remains visible after game ends until next game starts
+- **Smooth chart updates** – In-place data updates eliminate visual jitter during live play
 - **Per-button performance heatmaps** – Visual breakdown of hit rate by button position
 - **Reaction time analysis** – Average, best, and distribution of player response times
 - **Practice recommendations** – AI-style suggestions based on player weaknesses
