@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, Final
 
@@ -15,13 +16,15 @@ from dashboard.types import StatusOk
 LVL_MIN: Final = 1
 LVL_MAX: Final = 8
 
+STATIC_DIR: Final = Path(str(files("dashboard") / "static"))
+
 app: Final = FastAPI()
-app.mount(f"{APP_ROOT_PATH}/static", StaticFiles(directory=Path(__file__).parents[2] / "static"), name="static")
+app.mount(f"{APP_ROOT_PATH}/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
 async def dashboard() -> FileResponse:
-    return FileResponse("static/html/dashboard.html")
+    return FileResponse(STATIC_DIR / "html" / "dashboard.html")
 
 
 @app.get("/devices")

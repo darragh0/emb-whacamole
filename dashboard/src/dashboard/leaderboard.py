@@ -1,11 +1,11 @@
 import json
 import threading
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from typing import Any, Final
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-LEADERBOARD_FILE = BASE_DIR / "data" / "leaderboard.json"
+from .env import DATA_DIR
+
+LEADERBOARD_FILE: Final = DATA_DIR / "leaderboard.json"
 
 LEADERBOARD_LOCK: Final = threading.Lock()
 MAX_ENTRIES: Final = 5
@@ -77,7 +77,6 @@ def get_leaderboard() -> list[dict[str, Any]]:
 
 def _save() -> None:
     """Persist leaderboard to disk."""
-    LEADERBOARD_FILE.parent.mkdir(parents=True, exist_ok=True)
     data = [asdict(e) for e in leaderboard]
     LEADERBOARD_FILE.write_text(json.dumps(data, indent=2))
 
