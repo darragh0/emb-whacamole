@@ -4,7 +4,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict
 
-from paho.mqtt.client import Client, ConnectFlags, DisconnectFlags, MQTTMessage
+from paho.mqtt.client import Client, ConnectFlags, DisconnectFlags, MQTTMessage, MQTTMessageInfo
 from paho.mqtt.enums import CallbackAPIVersion, MQTTErrorCode
 
 from .misc import time_now_ms
@@ -108,14 +108,17 @@ class MqttClient:
 
         self._log.info("Disconnected from [bright_magenta]%s:%d", self.broker, self.port)
 
-    def publish_state(self, status: DevStatus) -> None:
+    def publish_state(self, status: DevStatus) -> MQTTMessageInfo:
         """Publish device state to MQTT.
 
         Args:
             status: Device status
+
+        Returns:
+            MQTTMessageInfo for caller to wait on if needed
         """
 
-        self._pub("state", self._status_payload(status), frm="Agent", to="MQTT")
+        return self._pub("state", self._status_payload(status), frm="Agent", to="MQTT")
 
     def publish_event(self, event: Any) -> None:  # noqa: ANN401
         """Publish game event to MQTT.
@@ -137,7 +140,9 @@ class MqttClient:
         """Return status payload for bridge state messages."""
         return {**self._common_payload(), "status": status}
 
-    def _pub(self, topic: str, pload: CommonPayload | StatusPayload, *, frm: str, to: str) -> None:
+    def _pub(
+        self, topic: str, pload: CommonPayload | StatusPayload, *, frm: str, to: str
+    ) -> MQTTMessageInfo:
         """Publish payload to given topic.
 
         Args:
@@ -147,12 +152,17 @@ class MqttClient:
         Keywords Args:
             frm: Source
             to: Destination
+
+        Returns:
+            MQTTMessageInfo for caller to wait on if needed
         """
         self._log.debug("[bright_white on grey30][%s -> %s][/] %s", frm, to, pload)
         res = self._client.publish(f"{self.topic}/{self.device_id}/{topic}", json.dumps(pload), qos=2)
 
         if res.rc != MQTTErrorCode.MQTT_ERR_SUCCESS:
             self._log.error("MQTT publish failed with rc=%s", res.rc)
+
+        return res
 
     def _sub(self, client: Client, topic: str) -> None:
         """Subscribe to given topic.

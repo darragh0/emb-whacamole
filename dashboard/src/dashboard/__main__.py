@@ -109,8 +109,6 @@ def main() -> None:
     threading.Thread(target=client.loop_forever, daemon=True).start()
     threading.Thread(target=check_device_timeouts, daemon=True).start()
 
-    print("[MQTT] Broadcasting heartbeat to all devices")
-    publish.single("whac/all/commands", "H", hostname=BROKER, port=MQTT_PORT, qos=2)
     uvicorn.run("dashboard.app:app", host="0.0.0.0", port=APP_PORT)  # noqa: S104
 
 

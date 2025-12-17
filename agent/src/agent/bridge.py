@@ -30,9 +30,6 @@ class Bridge:
 
     TOPIC_NAMESPACE: ClassVar = "whac"
     BYTES_ENCODING: ClassVar = "ascii"
-    AGENT_COMMANDS: ClassVar[dict[bytes, str]] = {
-        b"H": "heartbeat request",
-    }
     BOARD_COMMANDS: ClassVar[dict[bytes, str]] = {
         b"I": "identify",
         b"P": "pause toggle",
@@ -97,12 +94,13 @@ class Bridge:
                 self._serial.close()
                 return
 
-            self._mqtt.publish_state("online")
+            self._mqtt.publish_state("online").wait_for_publish()
 
             try:
                 self._read_events()
             finally:
                 self._cleanup_before_disconnect()
+                self._mqtt.publish_state("offline").wait_for_publish()
                 self._mqtt.disconnect()
                 self._serial.close()
 
@@ -125,12 +123,12 @@ class Bridge:
                     self._log.critical("Device unplugged, exiting")
                     status = "offline"
                 elif self._wait_for_reconnect():
-                    self._mqtt.publish_state("online")
+                    self._mqtt.publish_state("online").wait_for_publish()
                     continue
                 else:
                     status = "serial_error"
 
-                self._mqtt.publish_state(status)
+                self._mqtt.publish_state(status).wait_for_publish()
                 return
             except (UnicodeDecodeError, JSONDecodeError):
                 pass
@@ -202,14 +200,6 @@ class Bridge:
         Args:
             byte: Single-byte MQTT Command
         """
-
-        # Special case -- heartbeat (not forwarded to device)
-        if byte in Bridge.AGENT_COMMANDS:
-            match byte:
-                case b"H":
-                    self._log.debug("[bright_white on grey30][MQTT -> Agent][/] Heartbeat request")
-                    self._mqtt.publish_state("online")
-                    return
 
         if byte not in Bridge.BOARD_COMMANDS:
             self._log.warning("[MQTT -> Device] INVALID COMMAND: %r", byte)
