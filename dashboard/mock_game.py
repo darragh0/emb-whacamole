@@ -20,14 +20,18 @@ def simulate_game(client: mqtt.Client, device_id: str) -> None:
     base_topic = f"whac/{device_id}"
 
     # Publish device online
-    client.publish(f"{base_topic}/state", "online", qos=1)
+    client.publish(
+        f"{base_topic}/state",
+        json.dumps({"device_id": device_id, "status": "online"}),
+        qos=1,
+    )
     print(f"[{device_id}] Device online")
     time.sleep(0.5)
 
     # Start session
     client.publish(
         f"{base_topic}/game_events",
-        json.dumps({"event_type": "session_start"}),
+        json.dumps({"device_id": device_id, "event_type": "session_start"}),
         qos=1,
     )
     print(f"[{device_id}] Session started")
@@ -68,6 +72,7 @@ def simulate_game(client: mqtt.Client, device_id: str) -> None:
                 lives -= 1
 
             event = {
+                "device_id": device_id,
                 "event_type": "pop_result",
                 "mole_id": mole_id,
                 "outcome": outcome,
@@ -97,7 +102,7 @@ def simulate_game(client: mqtt.Client, device_id: str) -> None:
         if lives > 0:
             client.publish(
                 f"{base_topic}/game_events",
-                json.dumps({"event_type": "lvl_complete", "lvl": level}),
+                json.dumps({"device_id": device_id, "event_type": "lvl_complete", "lvl": level}),
                 qos=1,
             )
             print(f"[{device_id}] Level {level} complete!")
@@ -108,7 +113,7 @@ def simulate_game(client: mqtt.Client, device_id: str) -> None:
     won = lives > 0 and level > 8
     client.publish(
         f"{base_topic}/game_events",
-        json.dumps({"event_type": "session_end", "win": str(won).lower()}),
+        json.dumps({"device_id": device_id, "event_type": "session_end", "win": str(won).lower()}),
         qos=1,
     )
     print(f"\n[{device_id}] Session ended: {'VICTORY!' if won else 'GAME OVER'}")
@@ -150,7 +155,11 @@ def main() -> None:
         print(f"Error: {e}")
     finally:
         # Publish offline status
-        client.publish(f"whac/{args.device_id}/state", "offline", qos=1)
+        client.publish(
+            f"whac/{args.device_id}/state",
+            json.dumps({"device_id": args.device_id, "status": "offline"}),
+            qos=1,
+        )
         time.sleep(0.5)
         client.loop_stop()
         client.disconnect()
