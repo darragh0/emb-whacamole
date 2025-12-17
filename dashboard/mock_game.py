@@ -124,7 +124,10 @@ def main() -> None:
     args = parser.parse_args()
 
     print(f"Connecting to MQTT broker at {args.broker}:{args.port}...")
-    client = mqtt.Client(client_id=f"mock-{args.device_id}")
+    client = mqtt.Client(
+        client_id=f"mock-{args.device_id}",
+        callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+    )
 
     try:
         client.connect(args.broker, args.port, 60)

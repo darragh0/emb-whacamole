@@ -119,7 +119,7 @@ Where:
 | Cloud → Device | Single-byte commands | `P` (pause), `R` (reset), `S` (start), `1-8` (level) |
 
 - **Hardware-based device ID** – Uses chip's unique serial number (USN), no hardcoding
-- **Auto-reconnect** – Exponential backoff up to 600s on connection loss
+- **Auto-reconnect** – Exponential backoff up to 30s on connection loss
 - **Last-will testament** – MQTT publishes "offline" status if agent crashes
 - **QoS 2 messaging** – Exactly-once delivery for critical events
 
