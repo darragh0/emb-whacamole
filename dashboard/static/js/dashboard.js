@@ -155,7 +155,8 @@ function renderAnalysisModal(session, deviceId, sessionIndex) {
   const analysis = analyzeSession(session);
   if (!analysis) return "";
 
-  const modalId = `analysis-${deviceId}-${sessionIndex}`;
+  const safeDeviceId = String(deviceId).replace(/[^a-zA-Z0-9]/g, "_");
+  const modalId = `analysis-${safeDeviceId}-${sessionIndex}`;
   const chartId = `chart-${modalId}`;
 
   const weakMoles = analysis.moleStats
