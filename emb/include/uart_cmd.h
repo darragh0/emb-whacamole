@@ -12,4 +12,4 @@
  * @return E_SUCCESS on success, else error code
  * @see mxc_errors.h
  */
-BaseType_t uart_cmd_init(TaskHandle_t game_handle);
+const BaseType_t uart_cmd_init(TaskHandle_t game_handle);

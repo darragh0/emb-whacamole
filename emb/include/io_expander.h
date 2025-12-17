@@ -31,9 +31,10 @@
 int io_expander_init(void);
 
 /**
- * @brief Shutdown the I2C peripheral
+ * @brief Shut down the chip
  *
  * @return E_SUCCESS on success, else error code
+ * @see mxc_errors.h
  */
 int io_expander_deinit(void);
 
