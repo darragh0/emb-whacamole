@@ -65,7 +65,7 @@ extern QueueHandle_t cmd_queue;
 
 // Agent connection state (extern - defined in agent.c)
 extern volatile bool agent_connected;
-extern volatile TickType_t last_command_tick;
+extern volatile TickType_t last_cmd_tick;
 
 /**
  * @brief Initialize the FreeRTOS queues used by the game task

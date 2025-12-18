@@ -42,9 +42,7 @@ void UART_Handler(void) {
         int c = MXC_UART_ReadCharacterRaw(uart);
 
         // Any command (except D) refreshes connection timeout
-        if (c != 'D') {
-            last_command_tick = xTaskGetTickCount();
-        }
+        if (c != 'D') last_cmd_tick = xTaskGetTickCount();
 
         switch (c) {
             case 'P':
