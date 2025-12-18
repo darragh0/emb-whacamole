@@ -22,7 +22,8 @@ leaderboard: list[LeaderboardEntry] = []
 
 
 def calculate_score(events: list[dict[str, Any]]) -> int:
-    """getting score from session events."""
+    """Get score from session events."""
+
     score = 0
     lives_remaining = 5
     level_hits = {}
@@ -60,7 +61,8 @@ def calculate_score(events: list[dict[str, Any]]) -> int:
 
 
 def add_entry(device_id: str, score: int, timestamp: int) -> None:
-    """persists this storage to the json"""
+    """Persist this storage to json."""
+
     with LEADERBOARD_LOCK:
         entry = LeaderboardEntry(score=score, device_id=device_id, timestamp=timestamp)
         leaderboard.append(entry)
@@ -71,19 +73,21 @@ def add_entry(device_id: str, score: int, timestamp: int) -> None:
 
 def get_leaderboard() -> list[dict[str, Any]]:
     """Get current leaderboard."""
+
     with LEADERBOARD_LOCK:
         return [asdict(e) for e in leaderboard]
 
 
 def _save() -> None:
     """Persist leaderboard to disk."""
+
     data = [asdict(e) for e in leaderboard]
     LEADERBOARD_FILE.write_text(json.dumps(data, indent=2))
 
 
 def _load() -> None:
     """Load leaderboard from disk."""
-    global leaderboard
+    global leaderboard  # noqa: PLW0603
     if LEADERBOARD_FILE.exists():
         data = json.loads(LEADERBOARD_FILE.read_text())
         leaderboard = [LeaderboardEntry(**e) for e in data]

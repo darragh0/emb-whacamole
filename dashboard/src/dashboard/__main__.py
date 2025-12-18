@@ -1,5 +1,3 @@
-"""Cloud backend entry point."""
-
 import threading
 import time
 from typing import Any, Final
@@ -18,11 +16,12 @@ from .state import (
 )
 
 DEVICE_TIMEOUT_MS: Final = 30_000  # 30 seconds - mark offline if no message received
-TIMEOUT_CHECK_INTERVAL: Final = 5  # seconds between timeout checks
+TIMEOUT_CHECK_INTERVAL: Final = 5  # Secs between timeout checks
 
 
 def handle_message(data: dict[str, Any], topic: str) -> None:
     """Route MQTT messages to appropriate handlers."""
+
     if "/state" in topic:
         handle_state(data)
     elif "/game_events" in topic:
@@ -31,10 +30,11 @@ def handle_message(data: dict[str, Any], topic: str) -> None:
 
 def handle_state(data: dict[str, Any]) -> None:
     """Handle device state messages."""
-    device_id = data["device_id"]
-    if device_id is None:
+
+    if "device_id" not in data:
         return
 
+    device_id = data["device_id"]
     status = data.get("status")
     ts = data.get("ts", int(time.time() * 1000))
 
@@ -54,12 +54,12 @@ def handle_state(data: dict[str, Any]) -> None:
 def handle_game_event(data: dict[str, Any]) -> None:
     """Handle game events - auto-discover devices, update state."""
 
-    device_id = data.get("device_id")
+    if "device_id" not in data:
+        return
+
+    device_id = data["device_id"]
     event_type = data.get("event_type")
     ts = data.get("ts", int(time.time() * 1000))
-
-    if not device_id:
-        return
 
     with DEV_LOCK:
         if device_id not in devices:

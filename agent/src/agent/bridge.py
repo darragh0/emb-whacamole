@@ -320,4 +320,4 @@ class Bridge:
 
         # Notify device to start buffering events
         self._log.info("[bright_white on grey30][Agent -> Device][/] Sending disconnect command")
-        self._serial_write(b"D", ctx="sending disconnect command")
+        self._serial_write(b"D", ctx="attempting to disconnect device")
