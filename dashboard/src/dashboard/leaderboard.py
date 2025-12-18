@@ -1,13 +1,7 @@
-"""
-Leaderboard persistence and scoring logic.
+"""Leaderboard persistence and scoring logic.
 
 Maintains top scores across sessions, persisted to JSON file.
 Thread-safe for concurrent access from MQTT handler and API.
-
-Scoring Formula:
-    Base hit:     100 points * level * speed_bonus (0.5-2.0x based on reaction time)
-    Perfect level: 500 * level (bonus for completing level with no misses)
-    Lives bonus:   Final score * (1 + lives_remaining * 0.1)
 """
 
 import json
@@ -30,6 +24,7 @@ MAX_ENTRIES: Final = 5
 @dataclass
 class LeaderboardEntry:
     """Single leaderboard entry with score, device, and timestamp."""
+
     score: int
     device_id: str
     timestamp: int  # Unix timestamp (ms) when session ended
@@ -40,8 +35,7 @@ leaderboard: list[LeaderboardEntry] = []
 
 
 def calculate_score(events: list[dict[str, Any]]) -> int:
-    """
-    Calculate final score from session events.
+    """Calculate final score from session events.
 
     Scoring breakdown:
         - Each hit:  100 * level * speed_bonus (faster = more points)
@@ -88,8 +82,7 @@ def calculate_score(events: list[dict[str, Any]]) -> int:
 
 
 def add_entry(device_id: str, score: int, timestamp: int) -> None:
-    """
-    Add new score entry, maintaining sorted order and max size.
+    """Add new score entry, maintaining sorted order and max size.
 
     Called when a game session ends. Automatically persists to disk.
     """
@@ -114,8 +107,7 @@ def _save() -> None:
 
 
 def init() -> None:
-    """
-    Load leaderboard from disk at startup.
+    """Load leaderboard from disk at startup.
 
     Must be called once before accepting requests. Creates empty
     leaderboard if file doesn't exist.

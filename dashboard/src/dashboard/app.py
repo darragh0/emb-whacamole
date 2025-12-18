@@ -1,10 +1,9 @@
-"""
-FastAPI REST API for the Whac-A-Mole dashboard.
+"""FastAPI REST API for the Whac-A-Mole dashboard.
 
 Provides endpoints for:
-- Serving the dashboard HTML/JS frontend
-- Querying device state and leaderboard
-- Sending commands to devices via MQTT
+    - Serving the dashboard HTML/JS frontend
+    - Querying device state and leaderboard
+    - Sending commands to devices via MQTT
 
 Commands are forwarded to devices through MQTT pub/sub. The Python agent
 subscribed to the device's command topic receives the command and writes
@@ -33,7 +32,7 @@ LVL_MAX: Final = 8
 # Static files bundled with package (HTML, JS, CSS)
 STATIC_DIR: Final = Path(str(files("dashboard") / "static"))
 
-# Inject <base> tag for subpath deployment (e.g., behind reverse proxy at /whac/)
+# Inject <base> tag for subpath deployment (e.g., behind reverse proxy)
 BASE_TAG: Final = f'<base href="{APP_ROOT_PATH}/">' if APP_ROOT_PATH else ""
 
 app: Final = FastAPI()

@@ -2,10 +2,10 @@
 Dashboard entry point - MQTT subscriber and device state management.
 
 This module coordinates the real-time dashboard backend:
-1. Subscribes to MQTT topics for device state and game events
-2. Maintains in-memory device state (status, sessions, game progress)
-3. Updates leaderboard on session completion
-4. Runs timeout watchdog to detect offline devices
+    1. Subscribes to MQTT topics for device state and game events
+    2. Maintains in-memory device state (status, sessions, game progress)
+    3. Updates leaderboard on session completion
+    4. Runs timeout watchdog to detect offline devices
 
 Architecture:
     MQTT Broker --> handle_message() --> DeviceState (in-memory)
@@ -19,7 +19,8 @@ from typing import Any, Final
 import uvicorn
 
 from .env import APP_PORT, APP_ROOT_PATH
-from .leaderboard import add_entry, calculate_score, init as init_leaderboard
+from .leaderboard import add_entry, calculate_score
+from .leaderboard import init as init_leaderboard
 from .mqtt import subscribe
 from .state import (
     DEV_LOCK,
@@ -37,8 +38,7 @@ TIMEOUT_CHECK_INTERVAL: Final = 5
 
 
 def handle_message(data: dict[str, Any], topic: str) -> None:
-    """
-    Route MQTT messages to appropriate handlers based on topic.
+    """Route MQTT messages to appropriate handlers based on topic.
 
     Topics:
         whac/<device_id>/state       -> handle_state()
@@ -51,8 +51,7 @@ def handle_message(data: dict[str, Any], topic: str) -> None:
 
 
 def handle_state(data: dict[str, Any]) -> None:
-    """
-    Handle device state messages from Python agent.
+    """Handle device state messages from Python agent.
 
     Auto-discovers new devices and updates connection status.
     Agent publishes state on connect, disconnect, and serial errors.
@@ -80,8 +79,7 @@ def handle_state(data: dict[str, Any]) -> None:
 
 
 def handle_game_event(data: dict[str, Any]) -> None:
-    """
-    Handle game events from embedded device (via agent).
+    """Handle game events from embedded device (via agent).
 
     Tracks session lifecycle and calculates scores:
         session_start -> Create new Session, set game_state="playing"
@@ -115,7 +113,6 @@ def handle_game_event(data: dict[str, Any]) -> None:
                 device.current_session.won = data.get("win") == "true"
                 device.current_session.events.append(data)
 
-                # Calculate final score and update leaderboard
                 score = calculate_score(device.current_session.events)
                 add_entry(device_id, score, ts)
 
@@ -130,12 +127,10 @@ def handle_game_event(data: dict[str, Any]) -> None:
 
 
 def check_device_timeouts() -> None:
-    """
-    Background watchdog thread to detect offline devices.
+    """Background watchdog thread to detect offline devices.
 
-    Runs continuously, checking every TIMEOUT_CHECK_INTERVAL seconds.
     Marks devices as "offline" if no MQTT message received within DEVICE_TIMEOUT_MS.
-    This catches cases where agent crashes without sending disconnect message.
+    Catches cases where agent crashes without sending disconnect message.
     """
     while True:
         time.sleep(TIMEOUT_CHECK_INTERVAL)
@@ -147,8 +142,7 @@ def check_device_timeouts() -> None:
 
 
 def main() -> None:
-    """
-    Application entry point.
+    """Application entry point.
 
     1. Load persisted leaderboard from disk
     2. Subscribe to MQTT topics (wildcard '+' matches any device_id)
