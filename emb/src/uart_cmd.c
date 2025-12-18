@@ -8,6 +8,7 @@
  * - S: Start game
  * - 1-8: Set level
  * - I: Identify (respond with device ID)
+ * - D: Disconnect (mark agent as disconnected, start buffering events)
  *
  * Architecture:
  * UART RX Interrupt -> command dispatch -> task notification or queue
@@ -56,6 +57,11 @@ void UART_Handler(void) {
     while (MXC_UART_GetRXFIFOAvailable(uart) > 0) {
         int c = MXC_UART_ReadCharacterRaw(uart);
 
+        // Any command (except D) refreshes connection timeout
+        if (c != 'D') {
+            last_command_tick = xTaskGetTickCount();
+        }
+
         // 'P' command toggles pause state
         if (c == 'P') {
             /**
@@ -71,6 +77,9 @@ void UART_Handler(void) {
              * Since pause_task has highest priority (4), it will preempt current task.
              */
             xTaskNotifyFromISR(pause_task_handle, 0, eNoAction, &woken);
+        } else if (c == 'D') {
+            // Disconnect command - mark agent as disconnected (start buffering)
+            agent_connected = false;
         } else if (c == 'R') {
             const cmd_msg_t cmd = {.type = CMD_RESET};
             xQueueSendFromISR(cmd_queue, &cmd, &woken);

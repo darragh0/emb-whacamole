@@ -35,6 +35,7 @@ class Bridge:
         b"P": "pause toggle",
         b"R": "reset game",
         b"S": "start game",
+        b"D": "disconnect (start buffering)",
         b"1": "set level 1",
         b"2": "set level 2",
         b"3": "set level 3",
@@ -303,9 +304,13 @@ class Bridge:
         return self.serial_port in available
 
     def _cleanup_before_disconnect(self) -> None:
-        """Send unpause if device is paused before disconnecting."""
+        """Send unpause and disconnect command before disconnecting."""
 
         if self._paused:
             self._log.info("[bright_white on grey30][Agent -> Device][/] Unpausing device before disconnect")
             if self._serial_write(b"P", ctx="attempting to unpause device"):
                 self._paused = False
+
+        # Notify device to start buffering events
+        self._log.info("[bright_white on grey30][Agent -> Device][/] Sending disconnect command")
+        self._serial_write(b"D", ctx="sending disconnect command")
