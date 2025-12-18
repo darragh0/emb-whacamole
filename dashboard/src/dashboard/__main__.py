@@ -112,9 +112,9 @@ def handle_game_event(data: dict[str, Any]) -> None:
                 device.current_session.ended_at = ts
                 device.current_session.won = data.get("win") == "true"
                 device.current_session.events.append(data)
+                device.current_session.score = calculate_score(device.current_session.events)
 
-                score = calculate_score(device.current_session.events)
-                add_entry(device_id, score, ts)
+                add_entry(device_id, device.current_session.score, ts)
 
                 # Archive session (keep last N sessions for history)
                 device.past_sessions.insert(0, device.current_session)
@@ -124,6 +124,7 @@ def handle_game_event(data: dict[str, Any]) -> None:
         elif device.current_session:
             # Mid-session event (pop_result, lvl_complete)
             device.current_session.events.append(data)
+            device.current_session.score = calculate_score(device.current_session.events)
 
 
 def check_device_timeouts() -> None:

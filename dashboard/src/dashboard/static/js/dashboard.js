@@ -303,9 +303,9 @@ function computeScoreTimeline(events) {
     // Calculate score for this hit (simplified scoring formula)
     if (e.outcome === "hit") {
       const lvl = e.lvl || 1;
-      const reactionMs = e.reaction_ms || 500;
+      const reactionMs = e.reaction_ms || 1000;
       const speedBonus = Math.max(0.5, 2 - reactionMs / 1000);
-      cumulativeScore += Math.round(100 * lvl * speedBonus);
+      cumulativeScore += Math.trunc(100 * lvl * speedBonus);
     }
 
     timeline.push({
@@ -458,23 +458,6 @@ function renderScoreChart(canvas, events) {
 
   chartInstances.set(canvas.id, chart);
   return chart;
-}
-
-/**
- * Compute current live score from events (for display)
- */
-function computeLiveScore(events) {
-  const popEvents = events.filter(e => e.event_type === "pop_result");
-  let score = 0;
-  popEvents.forEach(e => {
-    if (e.outcome === "hit") {
-      const lvl = e.lvl || 1;
-      const reactionMs = e.reaction_ms || 500;
-      const speedBonus = Math.max(0.5, 2 - reactionMs / 1000);
-      score += Math.round(100 * lvl * speedBonus);
-    }
-  });
-  return score;
 }
 
 /**
@@ -735,7 +718,7 @@ function createDeviceCard(device) {
         <div class="px-4 py-3 border-b border-gray-800 live-chart-section">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs text-gray-500 uppercase tracking-wide live-label">Live Score</span>
-            <span class="text-sm font-bold text-sky-400 live-score">${computeLiveScore(device.current_session.events).toLocaleString()} pts</span>
+            <span class="text-sm font-bold text-sky-400 live-score">${device.current_session.score.toLocaleString()} pts</span>
           </div>
           <div style="height: 80px;">
             <canvas id="${liveChartId}" class="live-chart"></canvas>
@@ -919,7 +902,7 @@ function updateDeviceCard(card, device) {
     // Active game with pop events - store data for persistence
     lastSessionData.set(device.device_id, {
       events: device.current_session.events,
-      score: computeLiveScore(device.current_session.events),
+      score: device.current_session.score,
       firstEventType: device.current_session.events[0]?.event_type,
       isLive: true
     });
@@ -943,7 +926,7 @@ function updateDeviceCard(card, device) {
     // Update live score display
     const liveScoreEl = card.querySelector(".live-score");
     if (liveScoreEl) {
-      liveScoreEl.textContent = `${computeLiveScore(device.current_session.events).toLocaleString()} pts`;
+      liveScoreEl.textContent = `${device.current_session.score.toLocaleString()} pts`;
     }
     const liveLabel = card.querySelector(".live-label");
     if (liveLabel) {

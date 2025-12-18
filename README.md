@@ -33,7 +33,7 @@
 - **Disconnect tolerance** – Ring buffer stores 100 events when agent disconnects; auto-flush on reconnect
 - **Auto-reconnect** – Agent retries serial connection for 10 minutes on disconnect
 - **Multi-device support** – Dashboard auto-discovers devices via MQTT wildcards
-- **Live leaderboard** – Scoring algorithm with speed bonuses, persisted to disk
+- **Live leaderboard** – Real-time scoring (100 × level × speed bonus per hit), persisted to disk
 - **Analytics dashboard** – Real-time game state, session history, device status
 
 ## Components

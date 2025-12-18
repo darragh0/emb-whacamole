@@ -25,16 +25,13 @@ DEV_LOCK: Final = threading.Lock()
 
 @dataclass
 class Session:
-    """Tracks a single game session from session_start to session_end.
-
-    Events are accumulated as they arrive from the device. Score is
-    calculated from events when session ends.
-    """
+    """Tracks a single game session from session_start to session_end."""
 
     events: list[dict[str, Any]] = field(default_factory=list)
     started_at: int = 0
     ended_at: int = 0
     won: bool | None = None
+    score: int = 0
 
 
 @dataclass

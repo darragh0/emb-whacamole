@@ -35,50 +35,15 @@ leaderboard: list[LeaderboardEntry] = []
 
 
 def calculate_score(events: list[dict[str, Any]]) -> int:
-    """Calculate final score from session events.
-
-    Scoring breakdown:
-        - Each hit:  100 * level * speed_bonus (faster = more points)
-        - Perfect level bonus: 500 * level (no misses on that level)
-        - Lives multiplier: +10% per remaining life at end
-    """
+    """Calculate score from session events (100 * level * speed_bonus per hit)."""
     score = 0
-    lives_remaining = 5
-    level_hits = {}  # Track hits/misses per level for perfect bonus
-
     for event in events:
-        event_type = event.get("event_type")
-
-        if event_type == "pop_result":
-            outcome = event.get("outcome")
-            if outcome == "hit":
-                lvl = event.get("lvl", 1)
-                reaction_ms = event.get("reaction_ms", 1000)
-
-                # Speed bonus: 2x at 0ms, 1x at 1000ms, 0.5x minimum
-                base_points = 100
-                level_multiplier = lvl
-                speed_bonus = max(0.5, 2 - (reaction_ms / 1000))
-
-                score += int(base_points * level_multiplier * speed_bonus)
-
-                level_hits.setdefault(lvl, {"hits": 0, "misses": 0})
-                level_hits[lvl]["hits"] += 1
-            elif outcome == "miss":
-                lvl = event.get("lvl", 1)
-                level_hits.setdefault(lvl, {"hits": 0, "misses": 0})
-                level_hits[lvl]["misses"] += 1
-                lives_remaining = event.get("lives", lives_remaining)
-
-        elif event_type == "lvl_complete":
-            # Perfect level bonus: complete level without any misses
+        if event.get("event_type") == "pop_result" and event.get("outcome") == "hit":
             lvl = event.get("lvl", 1)
-            if lvl in level_hits and level_hits[lvl]["misses"] == 0:
-                score += 500 * lvl
-
-    # Lives bonus: +10% per remaining life
-    lives_bonus = 1 + (lives_remaining * 0.1)
-    return int(score * lives_bonus)
+            reaction_ms = event.get("reaction_ms", 1000)
+            speed_bonus = max(0.5, 2 - (reaction_ms / 1000))
+            score += int(100 * lvl * speed_bonus)
+    return score
 
 
 def add_entry(device_id: str, score: int, timestamp: int) -> None:
