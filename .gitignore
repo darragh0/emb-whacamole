@@ -23,4 +23,4 @@ venv/
 *.env
 
 # Program data
-cloud/data/
+leaderboard.json
