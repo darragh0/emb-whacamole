@@ -26,53 +26,6 @@
 [py-img]: https://img.shields.io/badge/3.12%2B-blue?style=flat-square&logo=python&logoColor=FFFD85
 [py-url]: https://www.python.org/
 
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                  Cloud Server (alderaan)                     │
-│  ┌─────────────────┐      ┌────────────────────────────┐    │
-│  │    Mosquitto    │◄────►│    Dashboard (FastAPI)     │    │
-│  │  MQTT Broker    │      │  • Web UI & Device Control │    │
-│  │    :1883        │      │  • Live Score Charts       │    │
-│  └────────┬────────┘      │  • Game Analytics          │    │
-│           │               │  • Leaderboard             │    │
-│           │               │         :8088              │    │
-│           │               └────────────────────────────┘    │
-└───────────┼─────────────────────────────────────────────────┘
-            │ MQTT
-            │
-┌───────────┼───────────┐
-│  Laptop   │           │
-│  ┌────────▼────────┐  │
-│  │  Python Agent   │  │
-│  │ (UART ↔ MQTT)   │  │
-│  └────────┬────────┘  │
-└───────────┼───────────┘
-            │ USB Serial (115200 baud)
-            │
-┌───────────▼───────────┐
-│  MAX32655 Device      │
-│  ┌─────────────────┐  │
-│  │    FreeRTOS     │  │
-│  │  ┌───────────┐  │  │
-│  │  │ Game Task │──────► 5ms polling, deterministic timing
-│  │  │   (P3)    │  │  │
-│  │  └─────┬─────┘  │  │
-│  │        │ Queue  │  │
-│  │  ┌─────▼─────┐  │  │
-│  │  │Agent Task │  │  │
-│  │  │   (P2)    │  │  │
-│  │  └───────────┘  │  │
-│  └────────┬────────┘  │
-│           │ I2C       │
-│  ┌────────▼────────┐  │
-│  │  MAX7325 GPIO   │  │
-│  │  8 LEDs + 8 Btns│  │
-│  └─────────────────┘  │
-└───────────────────────┘
-```
-
 ## Components
 
 | Directory    | Description                                                                                           |
@@ -81,91 +34,71 @@
 | `agent/`     | **Python UART-MQTT bridge** – Bidirectional relay between device & dashboard                          |
 | `dashboard/` | **Web dashboard (as MQTT backend)** – Persists events to JSONL; sends commands to device              |
 
-## Innovation Highlights
-
-### Real-Time Performance Guarantees
-
-- **5ms maximum detection latency** – Deterministic button polling using FreeRTOS `vTaskDelay()`
-- **Priority-based task scheduling** – Pause (P4) > Game (P3) > Agent (P2) prevents timing jitter
-- **Autonomous operation** – Game continues during network outages with 32-event buffer
-- **Tick-accurate timing** – 1ms FreeRTOS tick rate for precise reaction time measurement
-
-### Advanced Game Analytics
-
-- **Live score line graph** – Real-time chart showing score progression during gameplay
-- **Persistent final scores** – Graph remains visible after game ends until next game starts
-- **Smooth chart updates** – In-place data updates eliminate visual jitter during live play
-- **Per-button performance heatmaps** – Visual breakdown of hit rate by button position
-- **Reaction time analysis** – Average, best, and distribution of player response times
-- **Practice recommendations** – AI-style suggestions based on player weaknesses
-- **Session history** – Track past games with expandable event logs and score charts
-
-### Intelligent Scoring System
+## Architecture
 
 ```
-score = (base_points × level_multiplier × speed_bonus) + level_bonuses
-      × lives_multiplier
-
-Where:
-  • speed_bonus = max(0.5, 2 - reaction_time/1000)  → Faster = higher score
-  • level_multiplier = 1-8                          → Harder = more points
-  • perfect_level_bonus = 500 × level               → No misses = big bonus
-  • lives_multiplier = 1 + (lives × 0.1)            → Preserve lives = 1.5x max
+┌──────────────────────────────────────────────────────────────┐
+│                  Cloud Server (alderaan)                     │
+│   ┌─────────────────┐      ┌────────────────────────────┐    │
+│   │    Mosquitto    │<────>│    Dashboard (FastAPI)     │    │
+│   │  MQTT Broker    │      │  • Web UI & Device Control │    │
+│   │     :1883       │      │  • Live Score Charts       │    │
+│   └────────┬────────┘      │  • Game Analytics          │    │
+│            │               │  • Leaderboard             │    │
+│            │               │         :8088              │    │
+│            │               └────────────────────────────┘    │
+└────────────┼─────────────────────────────────────────────────┘
+             │ MQTT
+             │
+┌────────────┼───────────┐
+│   Laptop   │           │
+│  ┌─────────▼────────┐  │
+│  │   Python Agent   │  │
+│  │  (UART ↔ MQTT)   │  │
+│  └─────────┬────────┘  │
+└────────────┼───────────┘
+             │ USB Serial (115200 baud)
+             │
+┌────────────▼───────────┐
+│  MAX32655 Device       │
+│  ┌─────────────────┐   │
+│  │    FreeRTOS     │   │
+│  │  ┌───────────┐  │   │
+│  │  │ Game Task │───────► 5ms polling, deterministic timing
+│  │  │   (P3)    │  │   │
+│  │  └─────┬─────┘  │   │
+│  │        │ Queue  │   │
+│  │  ┌─────▼─────┐  │   │
+│  │  │Agent Task │  │   │
+│  │  │   (P2)    │  │   │
+│  │  └───────────┘  │   │
+│  └────────┬────────┘   │
+│           │ I2C        │
+│  ┌────────▼────────┐   │
+│  │  MAX7325 GPIO   │   │
+│  │  8 LEDs + 8 Btns│   │
+│  └─────────────────┘   │
+└────────────────────────┘
 ```
 
-### Robust Communication Protocol
+## Protocol
 
-| Direction | Format | Example |
-|-----------|--------|---------|
-| Device → Cloud | JSON events | `{"event_type":"pop_result","mole_id":3,"outcome":"hit","reaction_ms":245}` |
-| Cloud → Device | Single-byte commands | `P` (pause), `R` (reset), `S` (start), `1-8` (level) |
-
-- **Hardware-based device ID** – Uses chip's unique serial number (USN), no hardcoding
-- **Auto-reconnect** – Exponential backoff up to 30s on connection loss
-- **Last-will testament** – MQTT publishes "offline" status if agent crashes
-- **QoS 2 messaging** – Exactly-once delivery for critical events
+| Direction     | Format               | Example                                                                     |
+| ------------- | -------------------- | --------------------------------------------------------------------------- |
+| Device → MQTT | JSON events          | `{"event_type":"pop_result","mole_id":3,"outcome":"hit","reaction_ms":245}` |
+| MQTT → Device | Single-byte commands | `P` (pause), `R` (reset), `S` (start), `1-8` (level)                        |
 
 ## Installation
 
-### Agent/Dashboard
-
-Follow these steps to install agent or dashboard locally:
-
-#### Requirements
-
-- Python >= 3.12
-
-#### Using uv
-
 ```bash
+# Using uv
 uv sync && . ./.venv/bin/activate
+
+# Using pip
+python3 -m venv venv && . venv/bin/activate && pip install .
 ```
 
-#### Using pip
-
-```bash
-python3 -m venv venv
-. venv/bin/activate  # or `venv\Scripts\activate` on Windows
-pip install .        # or `pip install -e .` for development
-
-# Now you should be able to run `dashboard/agent` directly
-```
-
-#### Configuration
-
-Copy `.env.example` to `.env` and set the MQTT broker details:
-
-```bash
-cp .env.example .env
-```
-
-Required environment variables:
-
-- `MQTT_BROKER` - MQTT broker URL
-- `MQTT_PORT` - MQTT broker port (default: 1883)
-
-> [!NOTE]
-> If you are running the dashboard locally, you'll need to set the `APP_PORT` environment variable (to the port to run the dashboard on)
+See component READMEs for detailed setup.
 
 ## License
 

@@ -5,7 +5,7 @@ from typing import Any, Final
 import uvicorn
 
 from .env import APP_PORT, APP_ROOT_PATH
-from .leaderboard import add_entry, calculate_score
+from .leaderboard import add_entry, calculate_score, init as init_leaderboard
 from .mqtt import subscribe
 from .state import (
     DEV_LOCK,
@@ -103,6 +103,7 @@ def check_device_timeouts() -> None:
 
 def main() -> None:
     """Start MQTT subscriber and web server."""
+    init_leaderboard()
     topics = ["whac/+/game_events", "whac/+/state"]
     client = subscribe(topics, handle_message)
     threading.Thread(target=client.loop_forever, daemon=True).start()

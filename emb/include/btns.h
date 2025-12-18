@@ -9,14 +9,12 @@
 
 /**
  * @brief Map logical button index (0-7) to hardware pin number
- *
  * @note 0-3 are on top row, 4-7 are on bottom (left to right)
  */
 extern const uint8_t BTN_MAP[];
 
 /**
  * @brief Check if a button is pressed
- *
  * @param btn Button to check (0-7)
  * @param btn_state Button state from last read
  *

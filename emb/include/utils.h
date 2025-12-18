@@ -12,9 +12,7 @@
 
 /**
  * @brief Get the next random number
- *
  * @param state Random number generator state
- *
  * @return Next random number
  */
 uint32_t next_rand(uint32_t* const state);

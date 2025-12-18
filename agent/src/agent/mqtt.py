@@ -140,9 +140,7 @@ class MqttClient:
         """Return status payload for bridge state messages."""
         return {**self._common_payload(), "status": status}
 
-    def _pub(
-        self, topic: str, pload: CommonPayload | StatusPayload, *, frm: str, to: str
-    ) -> MQTTMessageInfo:
+    def _pub(self, topic: str, pload: CommonPayload | StatusPayload, *, frm: str, to: str) -> MQTTMessageInfo:
         """Publish payload to given topic.
 
         Args:
@@ -198,7 +196,7 @@ class MqttClient:
             return
 
         self._sub(client, f"{self.topic}/{self.device_id}/commands")
-        self._sub(client, f"{self.topic}/all/commands")
+        # self._sub(client, f"{self.topic}/all/commands")  # noqa: ERA001
         _ = userdata, connect_flags, properties
 
     def _on_disconnect(

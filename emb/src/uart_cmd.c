@@ -1,5 +1,4 @@
 /**
- * @file uart_cmd.c
  * @brief UART command handler using FreeRTOS task notifications and ISR
  *
  * Commands:
@@ -118,8 +117,8 @@ const BaseType_t uart_cmd_init(const TaskHandle_t game_handle) {
         configMAX_PRIORITIES - 1,
         &pause_task_handle
     );
-    if (err != pdPASS) return err;
 
+    if (err != pdPASS) return err;
     mxc_uart_regs_t* uart = MXC_UART_GET_UART(CONSOLE_UART);
 
     if ((err = MXC_UART_SetRXThreshold(uart, 1)) != E_SUCCESS) return err;

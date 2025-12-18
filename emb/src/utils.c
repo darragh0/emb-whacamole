@@ -11,6 +11,6 @@ uint32_t next_rand(uint32_t* const state) {
     return x;
 }
 
-const void eputs(const char* const msg, const long errno) {
+void eputs(const char* const msg, const long errno) {
     fprintf(stderr, "error: %s (%ld)\n", msg, errno);
 }

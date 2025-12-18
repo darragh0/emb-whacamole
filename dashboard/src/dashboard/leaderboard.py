@@ -85,12 +85,9 @@ def _save() -> None:
     LEADERBOARD_FILE.write_text(json.dumps(data, indent=2))
 
 
-def _load() -> None:
-    """Load leaderboard from disk."""
+def init() -> None:
+    """Load leaderboard from disk. Call once at startup."""
     global leaderboard  # noqa: PLW0603
     if LEADERBOARD_FILE.exists():
         data = json.loads(LEADERBOARD_FILE.read_text())
         leaderboard = [LeaderboardEntry(**e) for e in data]
-
-
-_load()

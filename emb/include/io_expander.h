@@ -24,7 +24,6 @@
 
 /**
  * @brief Wake up the chip and get it ready
- *
  * @return E_SUCCESS on success, else error code
  * @see mxc_errors.h
  */
@@ -32,7 +31,6 @@ int io_expander_init(void);
 
 /**
  * @brief Shut down the chip
- *
  * @return E_SUCCESS on success, else error code
  * @see mxc_errors.h
  */
@@ -41,7 +39,6 @@ int io_expander_deinit(void);
 /**
  * @brief Read button states
  * @param button_state To store updated button state in
- *
  * @return E_SUCCESS on success, else error code
  * @see mxc_errors.h
  */
@@ -49,9 +46,7 @@ int io_expander_read_btns(uint8_t* button_state);
 
 /**
  * @brief Write LED ouputs
- *
  * @param led_pattern New LED state (e.g., 10000001 turns on the first and last LED)
- *
  * @return E_SUCCESS on success, else error code
  * @see mxc_errors.h
  */

@@ -12,59 +12,44 @@ volatile bool identify_requested = false;
 
 // Agent connection state (used by uart_cmd.c for timeout tracking)
 volatile bool agent_connected = false;
-volatile TickType_t last_command_tick = 0;
+volatile TickType_t last_cmd_tick = 0;
+static event_ring_buffer_t evbuf;
 
-// Ring buffer for offline event storage
-typedef struct {
-    game_event_t events[EVENT_BUFFER_SIZE];
-    uint8_t head;   // next write position
-    uint8_t tail;   // next read position
-    uint8_t count;  // current item count
-} event_ring_buffer_t;
+static void send_event_json(const game_event_t* const event);
 
-static event_ring_buffer_t event_buffer;
-
-// Forward declaration for flush
-static void send_event_json(const game_event_t* event);
-
-void event_buffer_init(void) {
-    event_buffer.head = 0;
-    event_buffer.tail = 0;
-    event_buffer.count = 0;
+void evbuf_init(void) {
+    evbuf.head = 0;
+    evbuf.tail = 0;
+    evbuf.count = 0;
 }
 
-void event_buffer_push(const game_event_t* event) {
-    event_buffer.events[event_buffer.head] = *event;
-    event_buffer.head = (event_buffer.head + 1) % EVENT_BUFFER_SIZE;
-    if (event_buffer.count < EVENT_BUFFER_SIZE) {
-        event_buffer.count++;
+/** @brief Push event to ring buffer. On overflow, oldest event is silently dropped. */
+void evbuf_push(const game_event_t* const event) {
+    evbuf.events[evbuf.head] = *event;
+    evbuf.head = (evbuf.head + 1) % EVENT_BUFFER_SIZE;
+    if (evbuf.count < EVENT_BUFFER_SIZE) {
+        evbuf.count++;
     } else {
-        // Overwrite oldest - advance tail
-        event_buffer.tail = (event_buffer.tail + 1) % EVENT_BUFFER_SIZE;
+        evbuf.tail = (evbuf.tail + 1) % EVENT_BUFFER_SIZE;
     }
 }
 
-bool event_buffer_pop(game_event_t* event) {
-    if (event_buffer.count == 0) return false;
-    *event = event_buffer.events[event_buffer.tail];
-    event_buffer.tail = (event_buffer.tail + 1) % EVENT_BUFFER_SIZE;
-    event_buffer.count--;
+const bool evbuf_pop(game_event_t* const event) {
+    if (evbuf.count == 0) return false;
+    *event = evbuf.events[evbuf.tail];
+    evbuf.tail = (evbuf.tail + 1) % EVENT_BUFFER_SIZE;
+    evbuf.count--;
     return true;
 }
 
-uint8_t event_buffer_count(void) {
-    return event_buffer.count;
-}
+uint8_t evbuf_count(void) { return evbuf.count; }
 
-void event_buffer_flush(void) {
+void evbuf_flush(void) {
     game_event_t event;
-    while (event_buffer_pop(&event)) {
-        send_event_json(&event);
-    }
+    while (evbuf_pop(&event)) send_event_json(&event);
 }
 
-#define DEVICE_ID_LEN 10
-
+/** @brief Get unique device ID from chip's serial number (last 5 bytes, most distinct). */
 static const char* get_device_id(void) {
     static char id[DEVICE_ID_LEN + 1];
     static bool already_called = false;
@@ -134,13 +119,13 @@ static void send_event_json(const game_event_t* const event) {
 void agent_task(void* const param) {
     (void)param;
 
-    event_buffer_init();
+    evbuf_init();
     game_event_t event;
 
     while (true) {
         // Check for timeout -> mark disconnected
-        if (agent_connected &&
-            (xTaskGetTickCount() - last_command_tick) > pdMS_TO_TICKS(AGENT_TIMEOUT_MS)) {
+        if (agent_connected
+            && (xTaskGetTickCount() - last_cmd_tick) > pdMS_TO_TICKS(AGENT_TIMEOUT_MS)) {
             agent_connected = false;
         }
 
@@ -148,9 +133,9 @@ void agent_task(void* const param) {
         if (identify_requested) {
             identify_requested = false;
             agent_connected = true;
-            last_command_tick = xTaskGetTickCount();
+            last_cmd_tick = xTaskGetTickCount();
             send_identify();
-            event_buffer_flush();
+            evbuf_flush();
         }
 
         // Drain event queue
@@ -158,7 +143,7 @@ void agent_task(void* const param) {
             if (agent_connected) {
                 send_event_json(&event);
             } else {
-                event_buffer_push(&event);
+                evbuf_push(&event);
             }
         }
 

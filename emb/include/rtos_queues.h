@@ -12,6 +12,7 @@
 
 /** @brief Offline event buffer size (~1 game session worth) */
 #define EVENT_BUFFER_SIZE 100
+
 /** @brief Agent connection timeout (ms) - mark disconnected if no command received */
 #define AGENT_TIMEOUT_MS 60000
 
@@ -70,33 +71,31 @@ extern volatile TickType_t last_command_tick;
  * @brief Initialize the FreeRTOS queues used by the game task
  * @return 0 on success, -1 on error
  */
-int8_t rtos_queues_init(void);
+const int8_t rtos_queues_init(void);
 
 /**
  * @brief Initialize offline event buffer
  */
-void event_buffer_init(void);
+void evbuf_init(void);
 
 /**
  * @brief Push event to offline buffer (ring buffer - overwrites oldest if full)
  * @param event Event to push
  */
-void event_buffer_push(const game_event_t* event);
+void evbuf_push(const game_event_t* const event);
 
 /**
  * @brief Pop event from offline buffer
  * @param event Output event
  * @return true if event was popped, false if buffer empty
  */
-bool event_buffer_pop(game_event_t* event);
+const bool evbuf_pop(game_event_t* const event);
 
 /**
  * @brief Get number of events in offline buffer
  * @return Event count
  */
-uint8_t event_buffer_count(void);
+const uint8_t evbuf_count(void);
 
-/**
- * @brief Flush all buffered events via UART (called on reconnect)
- */
-void event_buffer_flush(void);
+/** @brief Flush all buffered events via UART (called on reconnect) */
+void evbuf_flush(void);

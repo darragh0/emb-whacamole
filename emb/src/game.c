@@ -209,9 +209,9 @@ static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
         uint16_t reaction_ms;
         pop_outcome_t outcome = pop_do(lvl_idx, &rng_state, &mole, &reaction_ms);
 
-        if (outcome == POP_HIT) {
+        if (outcome == POP_HIT)
             emit_pop_result(mole, outcome, reaction_ms, lvl_idx, pop + 1, pops);
-        } else {
+        else {
             lives--;
             emit_pop_result(mole, outcome, reaction_ms, lvl_idx, pop + 1, pops);
             feedback_late_or_miss();
@@ -222,13 +222,14 @@ static void game_run_level(const uint8_t lvl_idx, const uint8_t pops) {
             apply_reset_state(true);
             return;
         }
+
         if (should_switch_level(lvl_idx)) return;
     }
 
     emit_level_complete(lvl_idx);
 }
 
-/** @brief Wait for the user to start the game, showing "loading" LED pattern */
+/** @brief Wait for user to start game. Uses goto for clean exit from nested loops. */
 static int await_start(void) {
     uint8_t btn_state = BTN_HW_STATE;
 
