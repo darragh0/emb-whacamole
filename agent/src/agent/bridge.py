@@ -122,14 +122,11 @@ class Bridge:
             except SerialException:
                 if not self._device_connected():
                     self._log.critical("Device unplugged, exiting")
-                    status = "offline"
                 elif self._wait_for_reconnect():
                     self._mqtt.publish_state("online").wait_for_publish()
                     continue
                 else:
-                    status = "serial_error"
-
-                self._mqtt.publish_state(status).wait_for_publish()
+                    self._mqtt.publish_state("serial_error").wait_for_publish()
                 return
             except (UnicodeDecodeError, JSONDecodeError):
                 pass
@@ -313,7 +310,7 @@ class Bridge:
         """
 
         if not self._device_connected():
-            self._log.debug("Device unplugged, skipping cleanup commands")
+            self._log.debug("Skipping cleanup commands")
             return
 
         if self._paused:
