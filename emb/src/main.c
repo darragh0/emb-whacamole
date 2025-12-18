@@ -27,13 +27,13 @@ static long init_all(void) {
 
     TRY_INIT(io_expander_init(), E_SUCCESS, "failed to init MAX7325", return err);
     TRY_INIT(rtos_queues_init(), RTOS_QUEUES_OK, "failed to create queues", goto cleanup);
-    TRY_INIT(uart_cmd_init(game_handle), E_SUCCESS, "failed to init uart_cmd", goto cleanup);
     TRY_INIT(
         xTaskCreate(game_task, "Game", TASK_STACK_SIZE, NULL, GAME_TASK_PRIORITY, &game_handle),
         pdPASS,
         "failed to create Game task",
         goto cleanup
     );
+    TRY_INIT(uart_cmd_init(game_handle), E_SUCCESS, "failed to init uart_cmd", goto cleanup);
     TRY_INIT(
         xTaskCreate(agent_task, "Agent", TASK_STACK_SIZE, NULL, AGENT_TASK_PRIORITY, NULL),
         pdPASS,
