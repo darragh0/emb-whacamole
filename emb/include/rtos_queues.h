@@ -71,7 +71,7 @@ extern volatile TickType_t last_cmd_tick;
  * @brief Initialize the FreeRTOS queues used by the game task
  * @return 0 on success, -1 on error
  */
-const int8_t rtos_queues_init(void);
+int8_t rtos_queues_init(void);
 
 /**
  * @brief Initialize offline event buffer
@@ -79,7 +79,7 @@ const int8_t rtos_queues_init(void);
 void evbuf_init(void);
 
 /**
- * @brief Push event to offline buffer (ring buffer - overwrites oldest if full)
+ * @brief Push event to offline buffer (drops if full)
  * @param event Event to push
  */
 void evbuf_push(const game_event_t* const event);
@@ -89,13 +89,13 @@ void evbuf_push(const game_event_t* const event);
  * @param event Output event
  * @return true if event was popped, false if buffer empty
  */
-const bool evbuf_pop(game_event_t* const event);
+bool evbuf_pop(game_event_t* const event);
 
 /**
  * @brief Get number of events in offline buffer
  * @return Event count
  */
-const uint8_t evbuf_count(void);
+uint8_t evbuf_count(void);
 
 /** @brief Flush all buffered events via UART (called on reconnect) */
 void evbuf_flush(void);

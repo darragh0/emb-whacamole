@@ -20,29 +20,26 @@ static void send_event_json(const game_event_t* const event);
 void evbuf_init(void) {
     evbuf.head = 0;
     evbuf.tail = 0;
-    evbuf.count = 0;
 }
 
-/** @brief Push event to ring buffer. On overflow, oldest event is silently dropped. */
+/** @brief Push event to ring buffer. Returns false if full (event dropped). */
 void evbuf_push(const game_event_t* const event) {
+    const uint8_t next = (evbuf.head + 1) % EVENT_BUFFER_SIZE;
+    if (next == evbuf.tail) return; // Full - drop event
     evbuf.events[evbuf.head] = *event;
-    evbuf.head = (evbuf.head + 1) % EVENT_BUFFER_SIZE;
-    if (evbuf.count < EVENT_BUFFER_SIZE) {
-        evbuf.count++;
-    } else {
-        evbuf.tail = (evbuf.tail + 1) % EVENT_BUFFER_SIZE;
-    }
+    evbuf.head = next;
 }
 
-const bool evbuf_pop(game_event_t* const event) {
-    if (evbuf.count == 0) return false;
+bool evbuf_pop(game_event_t* const event) {
+    if (evbuf.head == evbuf.tail) return false; // Empty
     *event = evbuf.events[evbuf.tail];
     evbuf.tail = (evbuf.tail + 1) % EVENT_BUFFER_SIZE;
-    evbuf.count--;
     return true;
 }
 
-uint8_t evbuf_count(void) { return evbuf.count; }
+uint8_t evbuf_count(void) {
+    return (evbuf.head - evbuf.tail + EVENT_BUFFER_SIZE) % EVENT_BUFFER_SIZE;
+}
 
 void evbuf_flush(void) {
     game_event_t event;
