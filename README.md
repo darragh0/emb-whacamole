@@ -28,11 +28,11 @@
 
 ## Components
 
-| Directory    | Description                                                                                           |
-| ------------ | ----------------------------------------------------------------------------------------------------- |
-| `emb/`       | **FreeRTOS firmware** – Runs game loop; sends JSON events over UART; receives commands from dashboard |
-| `agent/`     | **Python UART-MQTT bridge** – Bidirectional relay between device & dashboard                          |
-| `dashboard/` | **Web dashboard (as MQTT backend)** – Persists events to JSONL; sends commands to device              |
+| Directory    | Description                                                                                                             |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `emb/`       | **FreeRTOS firmware** – Runs game loop; sends JSON events over UART; receives commands from dashboard                   |
+| `agent/`     | **Python UART-MQTT bridge** – Bidirectional relay between device & dashboard                                            |
+| `dashboard/` | **Web dashboard (as MQTT backend)** – Persists leaderboard to JSON; tracks sessions in-memory; sends commands to device |
 
 ## Architecture
 
@@ -86,7 +86,9 @@
 | Direction     | Format               | Example                                                                     |
 | ------------- | -------------------- | --------------------------------------------------------------------------- |
 | Device → MQTT | JSON events          | `{"event_type":"pop_result","mole_id":3,"outcome":"hit","reaction_ms":245}` |
-| MQTT → Device | Single-byte commands | `P` (pause), `R` (reset), `S` (start), `1-8` (level)                        |
+| MQTT → Device | Single-byte commands | `P` (pause), `I` (identify), `R` (reset), `S` (start), `1-8` (level)        |
+
+Agent to cloud server uses `H` (heartbeat)
 
 ## Dashboard/Agent Installation
 
