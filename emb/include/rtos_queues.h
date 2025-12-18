@@ -1,12 +1,3 @@
-/**
- * @details
- * FreeRTOS queues for inter-task communication
- *
- * Two queues:
- * - event_queue:  Game task  -> Agent task (game events to send to dashboard)
- * - cmd_queue:    Agent task -> Game task (commands from dashboard, e.g. pause)
- */
-
 #pragma once
 
 #include "FreeRTOS.h"
@@ -16,7 +7,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/** @brief Maximum events in the event queue */
 #define EVENT_QUEUE_LENGTH 32
 #define CMD_QUEUE_LENGTH 8
 
@@ -28,19 +18,18 @@
 #define RTOS_QUEUES_OK 0
 #define RTOS_QUEUES_ERR -1
 
-/** @brief Commands coming from dashboard */
 typedef enum {
-    CMD_SET_LEVEL = 0,
+    CMD_SET_LEVEL,
     CMD_RESET,
     CMD_START,
 } cmd_type_t;
 
+/** @brief Command sent to the game task */
 typedef struct {
     cmd_type_t type;
-    uint8_t level;  // 1-8 for CMD_SET_LEVEL (unused for other cmds)
+    uint8_t level;
 } cmd_msg_t;
 
-/** @brief Type of event sent from game to agent */
 typedef enum {
     EVENT_SESSION_START,
     EVENT_POP_RESULT,
@@ -48,7 +37,7 @@ typedef enum {
     EVENT_SESSION_END,
 } event_type_t;
 
-/** @brief Game event structure */
+/** @brief Event sent to the bridge/agent */
 typedef struct {
     event_type_t type;
     union {
@@ -65,12 +54,11 @@ typedef struct {
             uint8_t level;
         } level_complete;
         struct {
-            bool won; // true = win, false = loss
+            bool won;
         } session_end;
     } data;
 } game_event_t;
 
-// Queue handles (extern - defined in rtos_queues.c)
 extern QueueHandle_t event_queue;
 extern QueueHandle_t cmd_queue;
 
@@ -79,9 +67,8 @@ extern volatile bool agent_connected;
 extern volatile TickType_t last_command_tick;
 
 /**
- * @brief Initialize queues
- *
- * @return RTOS_QUEUES_OK on success, RTOS_QUEUES_ERR on failure
+ * @brief Initialize the FreeRTOS queues used by the game task
+ * @return 0 on success, -1 on error
  */
 int8_t rtos_queues_init(void);
 

@@ -4,16 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/**
- * @brief Send a single byte over I2C
- *
- * @param addr I2C address
- * @param buf Byte to send
- * @param write true to write, false to read
- *
- * @return E_SUCCESS on success, else error code
- * @see mxc_errors.h
- */
 static int mk_i2c_master_tx(const unsigned int addr, uint8_t* const buf, const bool write) {
     mxc_i2c_req_t tx_details = {
         .i2c = I2C_MASTER,
