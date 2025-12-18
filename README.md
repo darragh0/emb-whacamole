@@ -88,7 +88,7 @@
 | Device → MQTT | JSON events          | `{"event_type":"pop_result","mole_id":3,"outcome":"hit","reaction_ms":245}` |
 | MQTT → Device | Single-byte commands | `P` (pause), `R` (reset), `S` (start), `1-8` (level)                        |
 
-## Installation
+## Dashboard/Agent Installation
 
 ```bash
 # Using uv
@@ -98,7 +98,7 @@ uv sync && . ./.venv/bin/activate
 python3 -m venv venv && . venv/bin/activate && pip install .
 ```
 
-See component READMEs for detailed setup.
+See agent/dashboard READMEs for detailed setup.
 
 ## License
 
