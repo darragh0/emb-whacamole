@@ -149,8 +149,8 @@ void agent_task(void* const param) {
             identify_requested = false;
             agent_connected = true;
             last_command_tick = xTaskGetTickCount();
-            event_buffer_flush();  // Flush buffered events on reconnect
             send_identify();
+            event_buffer_flush();
         }
 
         // Drain event queue
