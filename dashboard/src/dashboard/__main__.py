@@ -121,8 +121,11 @@ def handle_game_event(data: dict[str, Any]) -> None:
                 device.past_sessions = device.past_sessions[:MAX_PAST_SESSIONS]
             device.current_session = None
 
-        elif device.current_session:
-            # Mid-session event (pop_result, lvl_complete)
+        elif event_type in ("pop_result", "lvl_complete"):
+            # Mid-session event - create session if missed session_start
+            if not device.current_session:
+                device.game_state = "playing"
+                device.current_session = Session(started_at=ts)
             device.current_session.events.append(data)
             device.current_session.score = calculate_score(device.current_session.events)
 

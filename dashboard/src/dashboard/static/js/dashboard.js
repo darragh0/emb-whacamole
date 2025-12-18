@@ -879,13 +879,15 @@ function updateDeviceCard(card, device) {
   const liveChartId = `live-chart-${safeDeviceId}`;
 
   // Check if a NEW game session has started (to clear old persisted data)
+  // Compare started_at timestamp - each session has a unique start time
   const storedData = lastSessionData.get(device.device_id);
+  const currentStartedAt = device.current_session?.started_at || 0;
   const isNewSession = hasCurrentSession &&
-    device.current_session.events.length > 0 &&
-    device.current_session.events[0]?.event_type !== storedData?.firstEventType;
+    storedData &&
+    currentStartedAt !== storedData.startedAt;
 
   // Clear persisted data if a new session starts
-  if (isNewSession && storedData) {
+  if (isNewSession) {
     lastSessionData.delete(device.device_id);
     if (chartInstances.has(liveChartId)) {
       chartInstances.get(liveChartId).destroy();
@@ -904,7 +906,7 @@ function updateDeviceCard(card, device) {
     lastSessionData.set(device.device_id, {
       events: device.current_session.events,
       score: device.current_session.score,
-      firstEventType: device.current_session.events[0]?.event_type,
+      startedAt: device.current_session.started_at,
       isLive: true
     });
 
