@@ -50,8 +50,14 @@ def add_entry(device_id: str, score: int, timestamp: int) -> None:
     """Add new score entry, maintaining sorted order and max size.
 
     Called when a game session ends. Automatically persists to disk.
+    Deduplicates entries within 2 seconds to prevent buffer flush duplicates.
     """
     with LEADERBOARD_LOCK:
+        # Prevent duplicate entries (same device within 2 seconds)
+        for existing in leaderboard:
+            if existing.device_id == device_id and abs(existing.timestamp - timestamp) < 2000:
+                return  # Duplicate, skip
+
         entry = LeaderboardEntry(score=score, device_id=device_id, timestamp=timestamp)
         leaderboard.append(entry)
         leaderboard.sort(key=lambda e: e.score, reverse=True)

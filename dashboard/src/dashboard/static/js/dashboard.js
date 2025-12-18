@@ -1,4 +1,4 @@
-const REFRESH_INTERVAL = 500;
+const REFRESH_INTERVAL = 1000;  // 1 second - balance between responsiveness and smoothness
 const LEADERBOARD_REFRESH_INTERVAL = 5000;
 
 const knownDevices = new Map();
@@ -642,6 +642,7 @@ function renderPastSession(session, index, deviceId) {
   const timeStr = date.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
   });
   const result = session.won
     ? '<span class="text-emerald-400">Won</span>'
@@ -936,7 +937,7 @@ function updateDeviceCard(card, device) {
     // Render/update the live chart
     renderLiveChart(liveChartId, device.current_session.events);
 
-    // Add/update event log
+    // Add/update event log (only if event count changed to reduce flicker)
     if (!eventLog) {
       const insertAfter = liveChartContainer || header;
       insertAfter.insertAdjacentHTML(
@@ -945,8 +946,13 @@ function updateDeviceCard(card, device) {
       );
       eventLog = card.querySelector(".event-log");
     }
-    eventLog.innerHTML = renderEventLog(device.current_session.events);
-    eventLog.scrollTop = eventLog.scrollHeight;
+    const prevEventCount = eventLog.dataset.eventCount || 0;
+    const newEventCount = device.current_session.events.length;
+    if (newEventCount !== parseInt(prevEventCount)) {
+      eventLog.innerHTML = renderEventLog(device.current_session.events);
+      eventLog.dataset.eventCount = newEventCount;
+      eventLog.scrollTop = eventLog.scrollHeight;
+    }
 
   } else if (!hasCurrentSession && storedData) {
     // Game ended - persist the final chart
@@ -995,8 +1001,13 @@ function updateDeviceCard(card, device) {
       );
       eventLog = card.querySelector(".event-log");
     }
-    eventLog.innerHTML = renderEventLog(device.current_session.events);
-    eventLog.scrollTop = eventLog.scrollHeight;
+    const prevEventCount = eventLog.dataset.eventCount || 0;
+    const newEventCount = device.current_session.events.length;
+    if (newEventCount !== parseInt(prevEventCount)) {
+      eventLog.innerHTML = renderEventLog(device.current_session.events);
+      eventLog.dataset.eventCount = newEventCount;
+      eventLog.scrollTop = eventLog.scrollHeight;
+    }
 
   } else {
     // No session and no stored data - clean up everything
