@@ -8,7 +8,7 @@ import socket
 from typing import TYPE_CHECKING, Any
 
 from paho.mqtt import publish
-from paho.mqtt.client import Client, ConnectFlags
+from paho.mqtt.client import Client, ConnectFlags, DisconnectFlags
 from paho.mqtt.enums import CallbackAPIVersion
 
 if TYPE_CHECKING:
@@ -55,6 +55,7 @@ def subscribe(topics: list[str], handler: Callable[[dict[str, Any], str], None])
 
     client_id = f"dashboard-{socket.gethostname()}-{os.getpid()}"
     mqttc = Client(client_id=client_id, callback_api_version=CallbackAPIVersion.VERSION2)
+    mqttc.reconnect_delay_set(min_delay=1, max_delay=30)
 
     def on_connect(
         client: Client,
@@ -72,16 +73,33 @@ def subscribe(topics: list[str], handler: Callable[[dict[str, Any], str], None])
         else:
             print(f"[MQTT] Connection failed: {reason_code}")
 
+    def on_disconnect(
+        client: Client,
+        userdata: Any,  # noqa: ANN401
+        disconnect_flags: DisconnectFlags,
+        reason_code: ReasonCode,
+        properties: Properties | None = None,
+    ) -> None:
+        _ = client, userdata, disconnect_flags, properties
+        if reason_code.is_failure:
+            print(f"[MQTT] Disconnected unexpectedly: {reason_code}, will reconnect...")
+        else:
+            print(f"[MQTT] Disconnected: {reason_code}")
+
     def on_message(
         client: Client,
         userdata: Any,  # noqa: ANN401
         message: MQTTMessage,
     ) -> None:
         _ = client, userdata
-        print(f"[MQTT] Received message on {message.topic}")
-        handler(json.loads(message.payload.decode()), message.topic)
+        try:
+            print(f"[MQTT] Received message on {message.topic}")
+            handler(json.loads(message.payload.decode()), message.topic)
+        except Exception as e:
+            print(f"[MQTT] Error processing message on {message.topic}: {e}")
 
     mqttc.on_connect = on_connect
+    mqttc.on_disconnect = on_disconnect
     mqttc.on_message = on_message
     print(f"[MQTT] Connecting to {BROKER}:{MQTT_PORT}...")
     mqttc.connect(BROKER, MQTT_PORT)

@@ -120,12 +120,6 @@ void agent_task(void* const param) {
     game_event_t event;
 
     while (true) {
-        // Check for timeout -> mark disconnected
-        if (agent_connected
-            && (xTaskGetTickCount() - last_cmd_tick) > pdMS_TO_TICKS(AGENT_TIMEOUT_MS)) {
-            agent_connected = false;
-        }
-
         // Handle identify request from bridge (marks connection)
         if (identify_requested) {
             identify_requested = false;

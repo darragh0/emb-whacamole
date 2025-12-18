@@ -31,7 +31,8 @@ from .state import (
 )
 
 # Device considered offline if no MQTT message received within this window
-DEVICE_TIMEOUT_MS: Final = 30_000
+# Set to 2.25x heartbeat interval (20s) to handle network hiccups
+DEVICE_TIMEOUT_MS: Final = 45_000
 
 # How often to check for timed-out devices (seconds)
 TIMEOUT_CHECK_INTERVAL: Final = 5
@@ -61,15 +62,15 @@ def handle_state(data: dict[str, Any]) -> None:
 
     device_id = data["device_id"]
     status = data.get("status")
-    ts = data.get("ts", int(time.time() * 1000))
+    now = int(time.time() * 1000)  # Use receive time, not message timestamp
 
     with DEV_LOCK:
         # Auto-discover: create DeviceState on first message from device
         if device_id not in devices:
-            devices[device_id] = DeviceState(device_id=device_id, last_seen=ts)
+            devices[device_id] = DeviceState(device_id=device_id, last_seen=now)
 
         device = devices[device_id]
-        device.last_seen = ts
+        device.last_seen = now
 
         # Preserve error/offline status from agent; otherwise mark online
         if status in ("serial_error", "offline"):
@@ -92,7 +93,8 @@ def handle_game_event(data: dict[str, Any]) -> None:
 
     device_id = data["device_id"]
     event_type = data.get("event_type")
-    ts = data.get("ts", int(time.time() * 1000))
+    now = int(time.time() * 1000)  # Use receive time, not message timestamp
+    ts = data.get("ts", now)  # Keep message ts for session timestamps
 
     with DEV_LOCK:
         # Auto-discover device if first event
@@ -100,7 +102,7 @@ def handle_game_event(data: dict[str, Any]) -> None:
             devices[device_id] = DeviceState(device_id=device_id)
 
         device = devices[device_id]
-        device.last_seen = ts
+        device.last_seen = now
 
         if event_type == "session_start":
             device.game_state = "playing"
@@ -122,12 +124,11 @@ def handle_game_event(data: dict[str, Any]) -> None:
             device.current_session = None
 
         elif event_type in ("pop_result", "lvl_complete"):
-            # Mid-session event - create session if missed session_start
-            if not device.current_session:
-                device.game_state = "playing"
-                device.current_session = Session(started_at=ts)
-            device.current_session.events.append(data)
-            device.current_session.score = calculate_score(device.current_session.events)
+            # Only process mid-session events if session exists
+            # Drop orphaned events (e.g., late arrivals after session_end)
+            if device.current_session:
+                device.current_session.events.append(data)
+                device.current_session.score = calculate_score(device.current_session.events)
 
 
 def check_device_timeouts() -> None:
