@@ -88,8 +88,6 @@
 | Device → MQTT | JSON events          | `{"event_type":"pop_result","mole_id":3,"outcome":"hit","reaction_ms":245}` |
 | MQTT → Device | Single-byte commands | `P` (pause), `I` (identify), `R` (reset), `S` (start), `1-8` (level)        |
 
-Agent to cloud server uses `H` (heartbeat)
-
 ## Dashboard/Agent Installation
 
 ```bash
