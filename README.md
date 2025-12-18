@@ -26,6 +26,16 @@
 [py-img]: https://img.shields.io/badge/3.12%2B-blue?style=flat-square&logo=python&logoColor=FFFD85
 [py-url]: https://www.python.org/
 
+## Features
+
+- **Real-time game loop** – 5ms deterministic button polling with FreeRTOS task priorities
+- **Bi-directional queuing** – Separate queues for events (Game→Agent) and commands (ISR→Game)
+- **Disconnect tolerance** – Ring buffer stores 100 events when agent disconnects; auto-flush on reconnect
+- **Auto-reconnect** – Agent retries serial connection for 10 minutes on disconnect
+- **Multi-device support** – Dashboard auto-discovers devices via MQTT wildcards
+- **Live leaderboard** – Scoring algorithm with speed bonuses, persisted to disk
+- **Analytics dashboard** – Real-time game state, session history, device status
+
 ## Components
 
 | Directory    | Description                                                                                           |
