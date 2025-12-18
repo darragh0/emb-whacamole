@@ -160,6 +160,8 @@ class Bridge:
                 else:
                     status.stop()
                     self._log.info("Reconnected to %s", self.serial_port)
+                    # Re-identify to flush any buffered events on device
+                    self._serial_write(b"I", ctx="re-identifying after reconnect")
                     return True
 
         self._log.critical("Failed to reconnect (timeout after %ds)", RECONNECT_TIMEOUT)
@@ -304,7 +306,15 @@ class Bridge:
         return self.serial_port in available
 
     def _cleanup_before_disconnect(self) -> None:
-        """Send unpause and disconnect command before disconnecting."""
+        """Send unpause and disconnect command before disconnecting.
+
+        Only sends commands if device is still physically connected.
+        If unplugged, device has reset anyway so no point sending commands.
+        """
+
+        if not self._device_connected():
+            self._log.debug("Device unplugged, skipping cleanup commands")
+            return
 
         if self._paused:
             self._log.info("[bright_white on grey30][Agent -> Device][/] Unpausing device before disconnect")
