@@ -1,3 +1,25 @@
+"""
+UART-MQTT Bridge for Whac-A-Mole embedded device.
+
+This module bridges communication between the MAX32655 embedded device
+(via UART/serial) and the MQTT broker (for dashboard integration).
+
+Data Flow:
+    Device -> UART -> Bridge -> MQTT -> Dashboard
+    Dashboard -> MQTT -> Bridge -> UART -> Device
+
+Protocol:
+    - Device sends JSONL events over UART (one JSON object per line)
+    - Bridge publishes events to MQTT topic: whac/<device_id>/game_events
+    - Dashboard sends commands via MQTT topic: whac/<device_id>/cmd
+    - Bridge forwards single-byte commands to device via UART
+
+Connection Handling:
+    - Auto-reconnect on serial disconnect (10 minute timeout)
+    - Heartbeat messages every 20s to indicate bridge is alive
+    - Graceful cleanup on shutdown (unpause, send 'D' to start buffering)
+"""
+
 from __future__ import annotations
 
 import json
@@ -16,20 +38,36 @@ if TYPE_CHECKING:
     from logging import Logger
 
 
-RECONNECT_TIMEOUT: Final = 600
-RECONNECT_RETRY_INTERVAL: Final = 2
+# Serial reconnection settings
+RECONNECT_TIMEOUT: Final = 600        # 10 minutes to reconnect before giving up
+RECONNECT_RETRY_INTERVAL: Final = 2   # Seconds between reconnect attempts
 
-DEVICE_ID_TIMEOUT: Final = 10
+# Device identification settings
+DEVICE_ID_TIMEOUT: Final = 10         # Seconds to wait for identify response
 DEVICE_ID_RETRY_INTERVAL: Final = 0.1
 
+# Heartbeat to indicate bridge is alive (MQTT retained message)
 HEARTBEAT_INTERVAL: Final = 20
 
 
 class Bridge:
-    """Bridges UART device to MQTT broker."""
+    """
+    Bridges UART device to MQTT broker.
+
+    Manages the full lifecycle of device communication:
+    1. Connect to serial port
+    2. Request device ID (identify handshake)
+    3. Setup MQTT with device-specific topics
+    4. Forward events (Device -> MQTT) and commands (MQTT -> Device)
+    5. Handle disconnects with auto-reconnect
+    6. Graceful cleanup on shutdown
+    """
 
     TOPIC_NAMESPACE: ClassVar = "whac"
     BYTES_ENCODING: ClassVar = "ascii"
+
+    # Valid single-byte commands that can be sent to the device
+    # Format: {byte: description} for logging/validation
     BOARD_COMMANDS: ClassVar[dict[bytes, str]] = {
         b"I": "identify",
         b"P": "pause toggle",
@@ -68,11 +106,19 @@ class Bridge:
         self._mqtt: MqttClient
         self._paused: bool = False
 
-    ####################################################### Pub ########################################################
+    # ==================== Public API ====================
 
     def run(self) -> None:
-        """Connect to MQTT and UART, then process events."""
+        """
+        Main entry point - connect to serial/MQTT and process events.
 
+        Connection sequence:
+        1. Connect to serial port
+        2. Send 'I' command to get device ID
+        3. Connect to MQTT broker with device-specific topics
+        4. Enter event loop (forward events until disconnect/error)
+        5. Cleanup: send 'D' to start buffering, publish offline, close connections
+        """
         try:
             if not self._connect_to_serial():
                 return
@@ -81,25 +127,27 @@ class Bridge:
                 self._serial.close()
                 return
 
-            # Setup MQTT now that we have device_id
+            # Setup MQTT now that we have device_id for topic routing
             self._mqtt = MqttClient(
                 broker=self.mqtt_broker,
                 port=self.mqtt_port,
                 device_id=self.device_id,
                 topic=Bridge.TOPIC_NAMESPACE,
                 on_command=self._handle_command,
-                last_will="offline",
+                last_will="offline",  # Auto-publish on ungraceful disconnect
             )
 
             if not self._mqtt.connect():
                 self._serial.close()
                 return
 
+            # Announce online status (retained message for late subscribers)
             self._mqtt.publish_state("online").wait_for_publish()
 
             try:
                 self._read_events()
             finally:
+                # Graceful shutdown: notify device and dashboard
                 self._cleanup_before_disconnect()
                 self._mqtt.publish_state("offline").wait_for_publish()
                 self._mqtt.disconnect()
@@ -108,11 +156,18 @@ class Bridge:
         finally:
             self._log.info("Shutdown complete")
 
-    ################################################# Utility Methods ##################################################
+    # ==================== Event Processing ====================
 
     def _read_events(self) -> None:
-        """Read and process events from serial port."""
+        """
+        Main event loop - read JSONL events from serial and publish to MQTT.
 
+        Handles:
+        - Normal events: Parse JSON, publish to MQTT
+        - Serial errors: Attempt reconnect or exit
+        - Decode errors: Log and skip malformed data
+        - Heartbeat: Periodic online status to keep dashboard aware
+        """
         self._log.debug("Listening for events")
 
         last_heartbeat = time.monotonic()
@@ -120,6 +175,7 @@ class Bridge:
             try:
                 jsonl = self._serial_read_jsonl()
             except SerialException:
+                # Serial error - check if device unplugged or cable issue
                 if not self._device_connected():
                     self._log.critical("Device unplugged, exiting")
                 elif self._wait_for_reconnect():
@@ -129,11 +185,13 @@ class Bridge:
                     self._mqtt.publish_state("serial_error").wait_for_publish()
                 return
             except (UnicodeDecodeError, JSONDecodeError):
+                # Malformed data - skip and continue (logged in _serial_read_jsonl)
                 pass
             else:
                 if jsonl is not None:
                     self._mqtt.publish_event(jsonl)
 
+            # Periodic heartbeat to keep dashboard informed bridge is alive
             now = time.monotonic()
             if now - last_heartbeat >= HEARTBEAT_INTERVAL:
                 self._mqtt.publish_state("online")
